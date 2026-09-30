@@ -10,6 +10,7 @@ import '../data/protocol/protocol.dart';
 import '../speech/speech_service.dart';
 import '../speech/tts_service.dart';
 import 'app_theme.dart';
+import 'calibration_screen.dart';
 import 'widgets/mic_button.dart';
 
 /// Pantalla unica de la app.
@@ -39,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int? _pressUs;
   int? _restUs;
   bool _calibrated = false;
+  bool _vrailOk = true;
   String _lastMessage = 'Toca el microfono y di "abre la puerta".';
   bool _micBusy = false;
 
@@ -158,6 +160,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _restUs = e.restUs;
         _calibrated = e.calibrated ?? false;
 
+      case AppEventKind.status:
+        if (e.vrailOk != null) {
+          _vrailOk = e.vrailOk!;
+        }
+
       case AppEventKind.done:
         _voice.onSequenceFinished();
         _lastMessage = e.isStall
@@ -177,7 +184,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           unawaited(_tts.speak(_messageFor(e.errorCode ?? DoorErrorCode.malformed)));
         }
 
-      case AppEventKind.status:
       case AppEventKind.ack:
       case AppEventKind.pong:
       case AppEventKind.unknown:
@@ -282,6 +288,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         title: const Text('Puerta por voz'),
         actions: <Widget>[
+          if (link.isReady)
+            IconButton(
+              tooltip: 'Calibración',
+              icon: const Icon(Icons.tune),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (context) => CalibrationScreen(link: link),
+                  ),
+                );
+              },
+            ),
           IconButton(
             tooltip: 'Conectar',
             onPressed: _connect,
@@ -402,6 +420,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       .textTheme
                       .bodyMedium
                       ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ),
+            if (!_vrailOk)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.battery_alert, color: AppTheme.warn, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Alimentación servo insuficiente (< 5.0 V)',
+                      style: TextStyle(color: scheme.error, fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ),
               ),
           ],

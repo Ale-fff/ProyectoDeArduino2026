@@ -196,11 +196,6 @@ class BleLink extends ChangeNotifier {
     }
   }
 
-  Future<bool> requestConfig() => send(AppCommand.getConfig);
-
-  /// Mantiene vivo el watchdog del firmware. Hay que llamarlo cada pocos
-  /// segundos mientras haya una secuencia en curso.
-  Future<bool> ping() => send(AppCommand.ping);
 
   Future<BluetoothCharacteristic?> _findCharacteristic(
     BluetoothDevice device,
@@ -245,16 +240,26 @@ class BleLink extends ChangeNotifier {
 
   // -------------------------------------------------------------------------
 
-  /// Envia un comando. Devuelve false si no hay conexion.
-  ///
-  /// El `seq` se incrementa aca y nunca se reenvia el mismo: el firmware
-  /// descarta los duplicados.
-  Future<bool> send(AppCommand cmd, {int? seqOverride}) async {
+  /// Envia un comando basico por [cmd]. Devuelve false si no hay conexion.
+  Future<bool> send(AppCommand cmd, {int? seqOverride}) {
+    return sendCommand(
+      Command(
+        cmd,
+        seqOverride ?? (_seq >= 65535 ? 1 : _seq + 1),
+      ),
+      incrementSeq: seqOverride == null,
+    );
+  }
+
+  /// Envia un [Command] completo (incluyendo posibles parametros como pressUs, etc).
+  Future<bool> sendCommand(Command command, {bool incrementSeq = true}) async {
     final rx = _rx;
     if (rx == null || _status != BleLinkStatus.ready) return false;
 
-    _seq = _seq >= 65535 ? 1 : _seq + 1;
-    final command = Command(cmd, seqOverride ?? _seq);
+    if (incrementSeq) {
+      _seq = command.seq;
+    }
+
     try {
       await rx.write(command.encode(), withoutResponse: false);
       return true;
@@ -266,6 +271,40 @@ class BleLink extends ChangeNotifier {
 
   /// Pide la configuracion actual. La respuesta llega por el stream de eventos.
   Future<bool> requestConfig() => send(AppCommand.getConfig);
+
+  /// Guarda una nueva configuracion en la NVS del dispositivo.
+  Future<bool> saveConfig({
+    required int pressUs,
+    required int restUs,
+    int? minUs,
+    int? maxUs,
+    int? holdMs,
+  }) {
+    final nextSeq = _seq >= 65535 ? 1 : _seq + 1;
+    return sendCommand(
+      Command(
+        AppCommand.saveConfig,
+        nextSeq,
+        pressUs: pressUs,
+        restUs: restUs,
+        minUs: minUs,
+        maxUs: maxUs,
+        holdMs: holdMs,
+      ),
+    );
+  }
+
+  /// Inicia el modo de calibracion/barrido en el servo.
+  Future<bool> calibrate({String mode = 'sweep'}) {
+    final nextSeq = _seq >= 65535 ? 1 : _seq + 1;
+    return sendCommand(
+      Command(
+        AppCommand.calibrate,
+        nextSeq,
+        mode: mode,
+      ),
+    );
+  }
 
   /// Mantiene vivo el watchdog del firmware. Hay que llamarlo cada pocos
   /// segundos mientras haya una secuencia en curso.

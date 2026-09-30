@@ -21,6 +21,4 @@ void begin(CommandRouter& router, DisconnectHook onDisconnect, void* user);
 
 bool isConnected();
 
-uint8_t lastRssi();
-
 }  // namespace BleService

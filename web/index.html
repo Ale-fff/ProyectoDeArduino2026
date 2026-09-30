@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ManejIA - Asistente Domótico por Voz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Header / Barra de Navegación -->
+  <header class="header">
+    <div class="container nav-container">
+      <div class="logo">
+        <span class="logo-icon">🎙️</span>
+        <span class="logo-text">ManejIA</span>
+      </div>
+      <nav class="nav-links">
+        <a href="#caracteristicas">Características</a>
+        <a href="#como-funciona">Funcionamiento</a>
+        <a href="#especificaciones">Hardware</a>
+        <a href="#descarga" class="btn btn-primary btn-sm">Descargar App</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-content">
+          <span class="badge">Control Domótico No Invasivo</span>
+          <h1>Abre puertas con tu voz de forma simple y segura</h1>
+          <p class="hero-description">
+            ManejIA es la solución integral que conecta tu teléfono inteligente con un actuador ESP32-S3 y un servomotor MG995. Diseñada especialmente para personas mayores o con movilidad reducida.
+          </p>
+          <div class="hero-actions">
+            <a href="#descarga" class="btn btn-primary btn-lg">
+              <span class="btn-icon">📥</span> Descargar para Android
+            </a>
+            <a href="#caracteristicas" class="btn btn-outline btn-lg">
+              Ver Características
+            </a>
+          </div>
+          <div class="app-meta">
+            <span>Versión 1.0.0</span>
+            <span class="dot">•</span>
+            <span>Bluetooth LE 5.0</span>
+            <span class="dot">•</span>
+            <span>Reconocimiento Local</span>
+          </div>
+        </div>
+
+        <div class="hero-preview">
+          <div class="phone-mockup">
+            <div class="screen-content">
+              <div class="mock-status">
+                <span class="status-indicator"></span>
+                <span>Conectado a PuertaVoz-ESP32</span>
+              </div>
+              <div class="mock-mic-wrapper">
+                <div class="mock-mic-ripple"></div>
+                <div class="mock-mic-circle">
+                  <span class="mic-glyph">🎙️</span>
+                </div>
+              </div>
+              <p class="mock-voice-prompt">"Abre la puerta"</p>
+              <div class="mock-buttons">
+                <div class="mock-btn mock-btn-open">Abrir Puerta</div>
+                <div class="mock-btn mock-btn-close">Cerrar / Reposo</div>
+                <div class="mock-btn mock-btn-estop">Parada Emergencia</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Características -->
+    <section id="caracteristicas" class="section bg-light">
+      <div class="container">
+        <div class="section-title">
+          <h2>Diseñada para la accesibilidad y seguridad</h2>
+          <p>Priorizamos la autonomía del usuario con interacción por voz y protección mecánica total.</p>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">🗣️</div>
+            <h3>Comandos por Voz Offline</h3>
+            <p>Reconocimiento de voz directo en tu dispositivo con confirmación verbal (TTS). No requiere conexión constante a servidores externos.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">🛡️</div>
+            <h3>Seguridad y Watchdog</h3>
+            <p>Retorno automático a reposo ante desconexiones. El actuador nunca presiona la manija indefinidamente evitando sobrecalentamiento del servo.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">⚙️</div>
+            <h3>Calibración Personalizable</h3>
+            <p>Ajusta el recorrido del servomotor (µs), límites mecánicos y tiempo de retención para adaptarse a cualquier tipo de manija de palanca.</p>
+          </div>
+
+          <div class="feature-card">
+            <div class="feature-icon">🔋</div>
+            <h3>Diagnóstico de Energía</h3>
+            <p>Monitoreo del voltaje del servo con avisos si la alimentación desciende de los 5.0 V necesarios para operar con fuerza.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cómo Funciona -->
+    <section id="como-funciona" class="section">
+      <div class="container">
+        <div class="section-title">
+          <h2>¿Cómo funciona el sistema?</h2>
+          <p>Un flujo intuitivo y robusto en tres simples pasos.</p>
+        </div>
+
+        <div class="steps-grid">
+          <div class="step-card">
+            <span class="step-num">1</span>
+            <h3>Presiona el Micrófono</h3>
+            <p>Toca el botón principal de la app y di <em>"abre la puerta"</em> o <em>"abrir"</em>.</p>
+          </div>
+          <div class="step-card">
+            <span class="step-num">2</span>
+            <h3>Confirmación Auditiva</h3>
+            <p>La app te preguntará si deseas confirmar. Con decir <em>"sí"</em> se valida la orden.</p>
+          </div>
+          <div class="step-card">
+            <span class="step-num">3</span>
+            <h3>Accionamiento Seguro</h3>
+            <p>El ESP32-S3 acciona el servo MG995, baja la manija durante el tiempo configurado y vuelve de inmediato a reposo.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Especificaciones de Hardware -->
+    <section id="especificaciones" class="section bg-light">
+      <div class="container">
+        <div class="section-title">
+          <h2>Especificaciones de Hardware</h2>
+          <p>Componentes requeridos para armar e instalar el sistema.</p>
+        </div>
+
+        <div class="specs-table-wrapper">
+          <table class="specs-table">
+            <thead>
+              <tr>
+                <th>Componente</th>
+                <th>Especificación</th>
+                <th>Función</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Microcontrolador</strong></td>
+                <td>ESP32-S3 (N16R8 / N8R2)</td>
+                <td>Controlador principal con BLE 5.0 y gestión de seguridad.</td>
+              </tr>
+              <tr>
+                <td><strong>Servomotor</strong></td>
+                <td>MG995 (Engranajes metálicos)</td>
+                <td>Accionamiento mecánico de la manija de puerta.</td>
+              </tr>
+              <tr>
+                <td><strong>Alimentación Servo</strong></td>
+                <td>Fuente externa 6V / 3A (GND común)</td>
+                <td>Energía de torque para evitar reinicios en el ESP32.</td>
+              </tr>
+              <tr>
+                <td><strong>Mecanismo</strong></td>
+                <td>No Invasivo</td>
+                <td>Acople sin perforar puertas ni alterar cerraduras existentes.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Descarga -->
+    <section id="descarga" class="section download-section">
+      <div class="container">
+        <div class="download-card">
+          <div class="download-content">
+            <h2>Descarga ManejIA en tu Teléfono</h2>
+            <p>Comienza a controlar tu puerta por voz hoy mismo. Compatible con dispositivos Android 8.0 o superior con Bluetooth BLE.</p>
+            <div class="download-buttons">
+              <a href="downloads/puertavoz-release.apk" class="btn btn-primary btn-lg" download>
+                <span class="btn-icon">📦</span> Descargar APK (Directo)
+              </a>
+              <a href="https://github.com" target="_blank" rel="noreferrer" class="btn btn-outline-white btn-lg">
+                <span class="btn-icon">💻</span> Ver Código Fuente
+              </a>
+            </div>
+            <p class="download-notes">
+              * Nota: Si instalas el archivo .apk por primera vez, habilita la opción de "Instalar aplicaciones de fuentes desconocidas" en los ajustes de tu dispositivo Android.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <p>© 2026 ManejIA / Proyecto Arduino. Código Abierto.</p>
+      <div class="footer-links">
+        <a href="#caracteristicas">Características</a>
+        <a href="#especificaciones">Hardware</a>
+        <a href="#descarga">Descargas</a>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# PlatformIO Build and Configuration
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+.idea/
+*.su
+*.o
+*.obj
+*.bin
+*.elf
+*.hex
+*.a
+*.lib
+
+# Dependencias instaladas
+lib/
+
+# Otros
+.DS_Store

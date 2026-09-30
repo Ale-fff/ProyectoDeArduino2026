@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 // ===========================================================================
@@ -87,5 +88,11 @@ static constexpr const char* SERVICE_UUID = "0000ff00-0000-1000-8000-00805f9b34f
 static constexpr const char* CHAR_RX_UUID = "0000ff01-0000-1000-8000-00805f9b34fb";
 static constexpr const char* CHAR_TX_UUID = "0000ff02-0000-1000-8000-00805f9b34fb";
 static constexpr uint16_t    BLE_MTU       = 247;
+
+// Tope de un evento saliente. El contrato fija 240 bytes de carga util; los
+// buffers del router se dimensionan con 216, asi que 240 es un techo comodo
+// que no llega a recortar ningun evento posible pero si corta un buffer
+// desbordado antes de mandarlo por el aire.
+static constexpr size_t      MAX_EVENT_BYTES = 240;
 
 static constexpr const char* FW_VERSION = "1.0.0";

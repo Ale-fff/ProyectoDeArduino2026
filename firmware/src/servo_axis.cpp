@@ -128,8 +128,14 @@ void ServoAxis::abort() {
     // Ya estaba en reposo. Aun asi hay que cerrar la secuencia: el router
     // promete que todo 'ack' lleva detras un 'done', y sin esto un e-stop en
     // reposo dejaria a la app esperando con el microfono bloqueado para
-    // siempre. finish() con dur_ms=0 produce el 'note=already_at_rest'.
-    _aborted = true;
+    // siempre.
+    //
+    // _seqStartMs se pone a cero AHORA, y no se reutiliza el de una secuencia
+    // anterior: finish() calcula la duracion como nowMs() - _seqStartMs, y si
+    // se dejara el valor viejo la duracion de este e-stop instantaneo seria el
+    // tiempo transcurrido desde el ultimo movimiento, en vez de 0.
+    _aborted    = true;
+    _seqStartMs = nowMs();
     finish(ErrCode::None);
 }
 

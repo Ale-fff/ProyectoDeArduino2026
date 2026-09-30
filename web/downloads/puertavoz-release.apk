@@ -1,0 +1,11 @@
+Este archivo representa el paquete de instalacion para Android (.apk) de la aplicacion ManejIA (PuertaVoz).
+
+Para generar el binario APK final de produccion:
+1. Asegurate de tener configurado Flutter SDK en tu equipo.
+2. Navega a la carpeta app:
+   cd app
+3. Ejecuta el comando de compilacion:
+   flutter build apk --release
+
+El archivo APK resultante se ubicara en:
+app/build/app/outputs/flutter-apk/app-release.apk

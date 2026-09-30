@@ -1,0 +1,11 @@
+# Entornos IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Archivos de entorno y secretos
+.env
+*.env

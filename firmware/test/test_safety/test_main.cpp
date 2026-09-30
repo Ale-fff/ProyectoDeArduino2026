@@ -36,13 +36,18 @@ void runUntilIdle(ServoAxis& axis, uint32_t maxMs = 12000) {
     }
 }
 
-void setUp() {
+}  // namespace
+
+// Unity declara setUp() y tearDown() como extern y las llama por su nombre.
+// Por eso NO pueden vivir en el namespace anonimo de arriba: ahi tendrian
+// enlace interno, Unity no las encontraria, y setUp() no se ejecutaria nunca.
+// Con el reloj simulado sin resetear entre tests, el tiempo se acumula y los
+// numeros de duracion salen de otro mundo.
+void setUp(void) {
     tb_reset();
 }
 
-void tearDown() {}
-
-}  // namespace
+void tearDown(void) {}
 
 // ---------------------------------------------------------------------------
 // servo_axis
