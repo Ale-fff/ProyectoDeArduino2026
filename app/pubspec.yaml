@@ -1,0 +1,38 @@
+name: puertavoz
+description: Asistente domotico no invasivo controlado por voz.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  # Dart 3.3 es el minimo porque el matcher usa switch expressions.
+  sdk: '>=3.3.0 <4.0.0'
+  # Flutter 3.22 es el minimo porque la UI usa ColorScheme.surfaceContainerHighest
+  # y Material 3 con surfaceContainer*.
+  flutter: '>=3.22.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Bluetooth LE (GATT). El paquete mas usado y mantenido para Flutter.
+  flutter_blue_plus: ^2.3.12
+
+  # Reconocimiento de voz. onDevice: true funciona offline en Android, pero
+  # SpeechService lo deja en false a proposito: el motor del sistema decide, y
+  # con false funciona tambien en iOS y en equipos sin modelo descargado.
+  speech_to_text: ^7.4.0
+
+  # Feedback de audio. Para este proyecto no es opcional: la app tiene que
+  # ser usable sin mirar la pantalla.
+  flutter_tts: ^4.2.0
+
+  # Permisos en runtime (microfono, bluetooth).
+  permission_handler: ^12.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
