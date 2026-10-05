@@ -9,9 +9,14 @@
 // Reglas de diseno que no se negocian:
 //
 //  1. No bloquea. Ni un solo delay(). Todo el tiempo se mide con nowMs().
-//  2. open  = PRESENTING -> HOLDING -> RETURNING -> IDLE
-//  3. Toda salida (normal, stall, estop, watchdog) termina en restUs.
-//     No existe ninguna ruta en la que el servo quede presionando la manija.
+//  2. open  = PRESENTING -> HOLDING, y se QUEDA en HOLDING. La secuencia de
+//     `open` termina (y emite su 'done') al llegar a press_us, no al soltar.
+//     Los unicos comandos que devuelven el servo a rest_us son `close` y
+//     `estop`.
+//  3. HOLDING es un estado estable y deliberado: la puerta se queda abierta
+//     porque la persona la abrio. NO hay ningun temporizador que la cierre.
+//     Anadir un "soltar a los N ms" seria dejar la puerta sin decidir por la
+//     persona, que es exactamente el fallo que este diseno evita.
 //  4. El pulso de salida se acota SIEMPRE con clampUs(), sin importar que
 //     mande la app. Un valor corrupto no puede mover el servo.
 //  5. El retorno a reposo es siempre a velocidad maxima, para no estorbar el
@@ -40,7 +45,15 @@ public:
     uint32_t     lastDurationMs() const { return _lastDurationMs; }
     AxisState    state() const { return _state; }
     uint16_t     positionUs() const { return _simUs; }
-    bool         busy() const { return _moveActive || _state == AxisState::Holding; }
+
+    // Hay un movimiento EN CURSO (PRESENTING o RETURNING). No cuenta HOLDING:
+    // en HOLDING el servo ya esta donde tiene que estar y no hay nada que
+    // esperar. Lo usan el watchdog y los tests.
+    bool moving() const { return _moveActive; }
+
+    // El servo esta moviendose o sosteniendo la manija. Con el contrato actual
+    // esto incluye HOLDING, asi que un open deja busy() en true a proposito.
+    bool busy() const { return _moveActive || _state == AxisState::Holding; }
 
     // Peticiones. No bloquean: solo mueven la maquina de estados.
     void requestOpen();
@@ -59,7 +72,12 @@ private:
     // Inicia un movimiento hacia targetUs.
     void beginMove(uint16_t targetUs, bool isReturn);
     void arrive();
-    void finish(ErrCode err);
+
+    // Cierra la secuencia y deja el estado en nextState. nextState casi siempre
+    // es Idle; el unico caso en el que no lo es es `open`, que termina en
+    // Holding. Antes esta funcion ponia siempre Idle y por eso era imposible
+    // que un open acabara presionando.
+    void finish(ErrCode err, AxisState nextState);
 
     void applyPulse(uint16_t us);
 
@@ -74,7 +92,6 @@ private:
     uint32_t _moveDoneMs   = 0;  // instante estimado de llegada
     bool     _moveActive   = false;
 
-    uint32_t _holdStartMs  = 0;
     uint32_t _seqStartMs   = 0;
     uint32_t _lastDurationMs = 0;
 

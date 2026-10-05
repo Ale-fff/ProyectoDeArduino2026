@@ -13,18 +13,20 @@ static ServoAxis     g_axis;
 static SafetyManager g_safety;
 static CommandRouter g_router(g_axis, g_safety, g_calib);
 
-// Si se cae la conexion BLE a mitad de un movimiento, el servo tiene que
-// volver a reposo igual. Es la misma politica que el watchdog: si nadie esta
-// mirando, el servo no queda tocando la manija.
+// Si se cae la conexion BLE, el servo se queda donde esta.
+//
+// Antes esto llamaba a g_axis.abort() y devolvia el pestillo a reposo. Con el
+// contrato actual eso ya no es correcto: si la persona abrio la puerta y solo
+// se le cae el movil o se cierra la app, la puerta NO debe cerrarse sola a los
+// 30 s. Cerrar es una decision suya, y para eso estan `close` y `estop`.
+//
+// Lo que no se hace aqui es NADA. El servo ya fue comandado a su destino en
+// beginMove(), asi que sigue su curso fisicamente aunque el BLE se caiga, y
+// el bookkeeping sigue avanzando en ServoAxis::task() desde loop(). Lo unico
+// que se pierde es la confirmacion: el 'done' se emite igualmente, pero sin
+// cliente al que notificar.
 static void onBleDisconnect(void* /*user*/) {
-    g_axis.abort();
-    // OJO: aqui NO se marca fin de movimiento. abort() es asincrono: el servo
-    // tardara lo que tarden los milisegundos del regreso en reposo. Marcarlo
-    // como terminado aqui dejaria el watchdog desarmado mientras el brazo
-    // sigue fuera de la posicion de reposo, que es justo el estado que el
-    // watchdog existe para vigilar. El 'done' lo emite tick() cuando el
-    // retorno termina, y ahi si se desarma.
-    PV_LOG_PRINTLN("[main] BLE desconectado durante movimiento: retorno a reposo");
+    PV_LOG_PRINTLN("[main] BLE desconectado: el servo se queda donde esta");
 }
 
 void setup() {
@@ -57,6 +59,9 @@ void setup() {
 }
 
 void loop() {
+    // Reanuda el anuncio BLE si el cliente se desconectó. Debe correr desde
+    // loop(), no desde el callback: allí compite con el stack y falla.
+    BleService::service();
     g_router.pollWatchdog();
     g_router.tick();
     // El resto de la logica es reactiva: todo pasa por handleRaw() desde el

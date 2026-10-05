@@ -9,3 +9,23 @@
 # Archivos de entorno y secretos
 .env
 *.env
+
+# Flutter / Dart
+# El .gitignore de app/ cubre casi todo, pero app/build/ pesa ~178 MB y desde
+# la raiz no lo excluia nadie.
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+app/**/local.properties
+
+# Platform builds generados
+**/android/.gradle/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+
+# Platformio / firmware
+firmware/.pio/
+firmware/.vscode/

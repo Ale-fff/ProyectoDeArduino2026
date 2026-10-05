@@ -177,12 +177,12 @@ void main() {
   });
 
   group('regla de confirmacion de la app', () {
-    test('solo open exige confirmacion por voz', () {
-      // La regla es simetrica: se confirma lo que sube el riesgo.
-      expect(IntentAction.open.needsVoiceConfirmation, isTrue);
-      expect(IntentAction.close.needsVoiceConfirmation, isFalse);
-      expect(IntentAction.stop.needsVoiceConfirmation, isFalse);
-      expect(IntentAction.cancel.needsVoiceConfirmation, isFalse);
+    test('ninguna intencion exige confirmacion por voz', () {
+      // Se retiro: tener la app abierta en la mano ya es la intencion.
+      for (final action in IntentAction.values) {
+        expect(action.needsVoiceConfirmation, isFalse,
+            reason: '$action no debe pedir confirmacion');
+      }
     });
   });
 }

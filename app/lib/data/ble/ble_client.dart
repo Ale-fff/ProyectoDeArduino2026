@@ -14,6 +14,13 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../protocol/protocol.dart';
 import 'ble_uuids.dart';
 
+/// MTU que se pide al ESP32.
+///
+/// Android arranca en 23 (solo 20 bytes utiles) y NO negocia solo. El
+/// contrato de PROTOCOL.md fija 240 bytes de carga con MTU 247, asi que hay
+/// que pedirlo explicitamente o el enlace se rompe en el primer comando.
+const int kPreferredMtu = 247;
+
 enum BleLinkStatus {
   unknown,
   bluetoothOff,
@@ -47,17 +54,43 @@ enum BleFailure {
   other,
 }
 
+class DiscoveredDevice {
+  const DiscoveredDevice({
+    required this.device,
+    required this.rssi,
+    required this.compatible,
+  });
+
+  final BluetoothDevice device;
+  final int rssi;
+  final bool compatible;
+}
+
 class BleLink extends ChangeNotifier {
-  BleLink({this.scanDuration = const Duration(seconds: 8)});
+  BleLink({this.scanDuration = const Duration(seconds: 10)});
 
   final Duration scanDuration;
 
-  final List<BluetoothDevice> _found = <BluetoothDevice>[];
-  List<BluetoothDevice> get foundDevices => List.unmodifiable(_found);
+  final List<DiscoveredDevice> _found = <DiscoveredDevice>[];
+
+  /// Todo lo que se ve al escanear, los compatibles primero y ordenado por
+  /// senal. Incluye dispositivos ajenos a proposito: si el ESP32 no anuncia
+  /// bien su UUID de servicio, seguiria apareciendo y se puede diagnosticar.
+  List<DiscoveredDevice> get foundDevices {
+    final sorted = List<DiscoveredDevice>.of(_found);
+    sorted.sort((a, b) {
+      if (a.compatible != b.compatible) return a.compatible ? -1 : 1;
+      return b.rssi.compareTo(a.rssi);
+    });
+    return List.unmodifiable(sorted);
+  }
 
   BluetoothDevice? _device;
   BluetoothCharacteristic? _rx;
   BluetoothCharacteristic? _tx;
+
+  StreamSubscription<List<int>>? _txSub;
+  StreamSubscription<BluetoothConnectionState>? _statusSub;
 
   BleLinkStatus _status = BleLinkStatus.unknown;
   BleLinkStatus get status => _status;
@@ -87,7 +120,7 @@ class BleLink extends ChangeNotifier {
         _fail('Este dispositivo no tiene Bluetooth', BleFailure.other);
         return;
       }
-      await FlutterBluePlus.initialize(logLevel: LogLevel.warn, showLogs: kDebugMode);
+      await FlutterBluePlus.setLogLevel(LogLevel.warning, color: false);
       await FlutterBluePlus.turnOn();
       _setStatus(BleLinkStatus.disconnected);
     } catch (e) {
@@ -100,8 +133,9 @@ class BleLink extends ChangeNotifier {
   /// tiene que comunicar con una instruccion de ir a Ajustes.
   Future<bool> ensureBluetoothOn() async {
     try {
-      final on = await FlutterBluePlus.isSupported ? FlutterBluePlus.turnOn() : false;
-      if (on) {
+      final supported = await FlutterBluePlus.isSupported;
+      if (supported) {
+        await FlutterBluePlus.turnOn();
         _setStatus(BleLinkStatus.disconnected, failure: BleFailure.none);
         return true;
       }
@@ -122,6 +156,15 @@ class BleLink extends ChangeNotifier {
 
   // -------------------------------------------------------------------------
 
+  /// Un dispositivo sirve si anuncia nuestro servicio o si se llama como
+  /// cualquiera de los dos prefijos que ha usado el proyecto.
+  static bool isCompatible(ScanResult r) {
+    if (r.advertisementData.serviceUuids.contains(BleUuids.service)) return true;
+    final name = r.advertisementData.advName;
+    return name.startsWith(BleUuids.namePrefix) ||
+        name.startsWith('ManejIA');
+  }
+
   Future<void> scan() async {
     if (!await ensureBluetoothOn()) return;
 
@@ -130,10 +173,10 @@ class BleLink extends ChangeNotifier {
 
     final sub = FlutterBluePlus.onScanResults.listen(_onScanResult);
     try {
-      await FlutterBluePlus.startScan(
-        withServices: <Guid>[BleUuids.service],
-        timeout: scanDuration,
-      );
+      // Sin filtro de servicio a proposito: el firmware de produccion no
+      // anuncia el UUID y con withServices la lista salia vacia sin decir
+      // por que. El filtrado compatible lo hace isCompatible() en cliente.
+      await FlutterBluePlus.startScan(timeout: scanDuration);
     } finally {
       await sub.cancel();
       if (_status == BleLinkStatus.scanning) {
@@ -144,13 +187,14 @@ class BleLink extends ChangeNotifier {
 
   void _onScanResult(List<ScanResult> results) {
     for (final r in results) {
-      if (r.device.platform != BluetoothDevicePlatform.unknown &&
-          r.advertisementData.advName.isNotEmpty &&
-          !r.advertisementData.advName.startsWith(BleUuids.namePrefix)) {
+      if (_found.any((d) => d.device.remoteId.str == r.device.remoteId.str)) {
         continue;
       }
-      if (_found.any((d) => d.remoteId.str == r.device.remoteId.str)) continue;
-      _found.add(r.device);
+      _found.add(DiscoveredDevice(
+        device: r.device,
+        rssi: r.rssi,
+        compatible: isCompatible(r),
+      ));
       notifyListeners();
     }
   }
@@ -169,7 +213,11 @@ class BleLink extends ChangeNotifier {
         mtu: null,
         // Timeout corto: si no conecta en 10 s, mejor que la persona lo sepa
         // y reintente que quedarse mirando una pantalla de carga.
-        connectionTimeout: const Duration(seconds: 10),
+        timeout: const Duration(seconds: 10),
+        // Obligatorio desde flutter_blue_plus 2.3.13. Este proyecto es personal
+        // y sin animo de lucro, asi que declara nonprofit. Cambiar a
+        // License.commercial si algun dia se usa en una empresa.
+        license: License.nonprofit,
       );
 
       // CRITICO: hay que re-descubrir los servicios en CADA conexion. En
@@ -182,6 +230,14 @@ class BleLink extends ChangeNotifier {
         await disconnect();
         return;
       }
+
+      // CRITICO: negociar el MTU. Sin esto Android se queda en el MTU por
+      // defecto de 23 bytes, que solo admite 20 bytes de carga util: cualquier
+      // comando del contrato ({"cmd":"get_config","seq":1} son 28) se rechaza
+      // con "data longer than allowed", y el firmware trunca en silencio los
+      // notify a 20 bytes. Pasar mtu en connect() tambien funciona, pero se
+      // hace aparte para que un fallo de negociacion no tumbe la conexion.
+      await _negotiateMtu(device);
 
       await _tx!.setNotifyValue(true);
       _txSub?.cancel();
@@ -196,6 +252,27 @@ class BleLink extends ChangeNotifier {
     }
   }
 
+
+  /// Pide un MTU grande y comprueba lo que quedo realmente negociado.
+  ///
+  /// Android NO negocia MTU por su cuenta: el valor se queda en 23 hasta que
+  /// la app lo pide explicitamente. Un fallo aqui degrada el enlace pero no lo
+  /// rompe, asi que se avisa por consola y se sigue.
+  Future<void> _negotiateMtu(BluetoothDevice device) async {
+    try {
+      await device.requestMtu(kPreferredMtu);
+      final negotiated = device.mtuNow;
+      debugPrint('[ble] MTU negociado: $negotiated '
+          '(${negotiated - 3} bytes de carga util)');
+      if (negotiated < 64) {
+        debugPrint('[ble] ATENCION: MTU bajo ($negotiated). Los comandos de más '
+            'de ${negotiated - 3} bytes fallaran y el firmware truncara los '
+            'eventos grandes.');
+      }
+    } catch (e) {
+      debugPrint('[ble] no se pudo negociar el MTU: $e');
+    }
+  }
 
   Future<BluetoothCharacteristic?> _findCharacteristic(
     BluetoothDevice device,
@@ -261,7 +338,7 @@ class BleLink extends ChangeNotifier {
     }
 
     try {
-      await rx.write(command.encode(), withoutResponse: false);
+      await rx.write(utf8.encode(command.encode()), withoutResponse: false);
       return true;
     } catch (e) {
       _fail('No se pudo enviar la orden: $e', BleFailure.other);

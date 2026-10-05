@@ -75,18 +75,18 @@ Nombre Bluetooth: `PuertaVoz-XXXX`, donde `XXXX` son los 4 últimos dígitos del
 
 ```json
 {"ev":"ack","seq":42,"action":"open","state":"PRESENTING"}
-{"ev":"done","seq":42,"action":"open","state":"REST","dur_ms":2340}
-{"ev":"done","seq":43,"action":"close","state":"REST","dur_ms":0,"note":"already_at_rest"}
+{"ev":"done","seq":42,"action":"open","state":"HOLDING","dur_ms":276}
+{"ev":"done","seq":43,"action":"close","state":"IDLE","dur_ms":0,"note":"already_at_rest"}
 {"ev":"error","seq":42,"code":"STALL","msg":"no alcanzo press_us en 2000 ms; retorno a reposo"}
 {"ev":"config","press_us":1800,"rest_us":1500,"min_us":950,"max_us":2050,"hold_ms":1500,"calibrated":true,"fw":"1.0.0"}
-{"ev":"status","state":"REST","servo_us":1500,"vrail_ok":true,"fw":"1.0.0"}
+{"ev":"status","state":"HOLDING","servo_us":1800,"vrail_ok":true,"fw":"1.0.0"}
 {"ev":"pong","seq":45}
 ```
 
 | `ev` | Cuándo |
 |---|---|
 | `ack` | Inmediatamente al aceptar un comando válido |
-| `done` | Al terminar la secuencia. **Todo `ack` de movimiento lleva detrás exactamente un `done`**, incluso si el servo ya estaba en reposo (`note=already_at_rest`) |
+| `done` | Al terminar la secuencia. **Todo `ack` de movimiento lleva detrás exactamente un `done`**, incluso si el servo ya estaba en reposo (`note=already_at_rest`). En `open` llega al **llegar a `press_us`**, no al soltar |
 | `error` | Comando rechazado. Un movimiento abortado se reporta con `done` + `note=stall` / `note=watchdog`, no con `error` |
 | `config` | Respuesta a `get_config` o a `save_config` |
 | `status` | Periódico (cada 5 s) |
@@ -105,8 +105,24 @@ Nombre Bluetooth: `PuertaVoz-XXXX`, donde `XXXX` son los 4 últimos dígitos del
 
 `IDLE` · `PRESENTING` · `HOLDING` · `RETURNING`
 
-`REST` es un valor de `state` que solo aparece en el evento `done`, significando
-"terminó y el servo está en `rest_us`".
+`state` refleja **el estado real del servo en el momento del evento**, no una
+etiqueta fija:
+
+| `state` | Significado |
+|---|---|
+| `IDLE` | El servo está en `rest_us`. En `done` significa "terminó y soltó" |
+| `PRESENTING` | Avanzando hacia `press_us` |
+| `HOLDING` | Sosteniendo la manija presionada. En el `done` de `open` es lo normal |
+| `RETURNING` | Volviendo a `rest_us` |
+
+El `done` de `open` lleva `"state":"HOLDING"` y el de `close` lleva
+`"state":"IDLE"`. La app usa ese valor, no una suposición, para decidir si el
+micrófono queda libre.
+
+> `REST` aparece en algunos ejemplos antiguos de este documento como si fuera un
+> estado más. **No existe**: el enumerado de estados del firmware es el de la
+> tabla de arriba. Si alguna implementación antigua emite `REST`, traitée como
+> synonym de `IDLE`.
 
 ### Campos de `status`
 
@@ -144,20 +160,21 @@ un ADC de verdad.
 | `max_us` | 1100–2100 | 2000 | Límite mecánico duro superior |
 | `rest_us` | `[min_us, max_us]` | 1500 | **Estado seguro.** El servo no toca la manija |
 | `press_us` | `[min_us, max_us]` | 1800 | Manija presionada, pestillo retraído |
-| `hold_ms` | 300–3000 | 1500 | Cuánto mantiene presionada la manija |
+| `hold_ms` | 300–3000 | 1500 | **Legado.** Se publica y se valida, pero ya no governa cuándo se suelta el pestillo |
 
-`rest_us` es simultáneamente el estado de reposo, el destino de todas las salidas de error y el
-estado de apagado seguro. No existe ninguna ruta de ejecución en la que el servo termine
-presionando la manija.
+`rest_us` es el estado de reposo, el destino de todas las salidas de error y el estado de apagado
+seguro. Es el único valor al que vuelve el servo por su cuenta **o por orden explícita**: tras un
+`open` el servo se queda en `press_us` hasta que llega un `close` o un `estop`.
 
 ### Ajustes mecánicos que impone el firmware
 
 1. **El retorno a `rest_us` es siempre a velocidad máxima.** El brazo no debe estorbar el cierre
    de la puerta ni interferir con un closer.
-2. **`hold_ms` debe ser suficiente para que la persona empuje la puerta.** Si se suelta antes de
-   tiempo, el pestillo se re-engancha y la puerta no abre. Se ajusta en pruebas de campo (Fase 6).
+2. **`hold_ms` ya no decide nada.** Antes soltaba la manija por tiempo. Ahora el
+   pestillo se queda retraído hasta que la persona mande `close` o `estop`: la puerta no se
+   cierra sola. El campo se conserva en el contrato por compatibilidad con la app y con la NVS.
 3. **`press_us` nunca puede cruzar `rest_us`** hacia un lado que exceda `max_us`: siempre se acota
-   con `constrain()` contra `[min_us, max_us]`, sin importa qué envíe la app.
+   con `clampUs()` contra `[min_us, max_us]`, sin importar qué envíe la app.
 
 ---
 
@@ -165,26 +182,68 @@ presionando la manija.
 
 Modelo mecánico: **manija de palanca con resorte**.
 
-- `open` = bajar la manija (retraer el pestillo), sostener, soltar. La puerta queda desbloqueada.
-- `close` = **no requiere acción del servo.** La persona empuja la puerta y el pestillo se
-  re-engancha solo. El servo solo necesita estar en reposo para no estorbar.
+- `open` = bajar la manija (retraer el pestillo) y **quedarse abajo**. La puerta queda
+  desbloqueada.
+- `close` = soltar el pestillo: el servo vuelve a `rest_us`. La persona empuja la puerta.
 
-Por lo tanto `close` es un alias de "ir a `rest_us`", y por diseño **no pide confirmación de voz**:
-se ejecuta de inmediato. La regla de interacción es simétrica:
+### El servo NO vuelve solo tras `open`
 
-> Se confirma lo que **aumenta** el riesgo. Se ejecuta de inmediato lo que lo **reduce**.
+Anteriormente el firmware mantenía la manija bajada `hold_ms` (1,5 s) y volvía a reposo solo.
+**Se eliminó.**
 
-`open` es la única acción que mueve el servo hacia un estado no-seguro, y es la única que exige
-confirmación en dos pasos por voz.
+Motivo: el pestillo tiene resorte, así que la puerta se desbloquea en cuanto se presiona y se
+**re-engancha sola al soltar**. Devolver el servo a reposo solo mantendría la puerta bloqueada sin
+motivo. Ahora `open` deja el servo en `press_us` hasta que llega un `close`.
 
-### Honestidad del estado
+Consecuencias en el contrato:
 
-El MG995 no reporta posición y el ESP32 no tiene sensor de puerta. La app **no puede afirmar que la
-puerta está cerrada**; solo puede afirmar que el actuador está en reposo. Todo el feedback verbal
-debe hablar del actuador, nunca de la puerta.
+- **`done` se envía al llegar a `press_us`, no al volver a reposo.** Es obligatorio: la app
+  bloquea el micrófono mientras está en fase `executing`, así que sin ese `done` la puerta se
+  quedaba abierta y sin forma de cerrarla, ni a mano ni por voz.
+- El watchdog de 30 s solo aborta un **movimiento en curso**. Antes su condición era
+  "no estoy en reposo", que arrastraba también a la posición sostenida y lo devolvía a reposo a
+  los 30 s aunque la app siguiera conectada. La app manda `ping` cada 5 s mientras esté conectada
+  para renovar el reloj del watchdog.
+- `close` y `estop` tienen que admitir el comando viniendo de la posición sostenida. Si solo se
+  acepta en reposo, el servo queda trabado presionado sin poder soltar el pestillo.
+- Desconectar **no** suelta el pestillo: el servo se queda donde está.
 
-Frase obligatoria tras `open`: *"Puerta desbloqueada. Presiona la puerta para cerrarla."*
-Frase obligatoria tras `close`: *"Actuador en reposo. Presiona la puerta para cerrarla."*
+### Confirmación de voz: retirada
+
+Antes esta spec exigía que `open` pidiera un "sí" explícito, con la regla de que se confirma lo que
+**aumenta** el riesgo y se ejecuta de inmediato lo que lo **reduce**. **Se eliminó.**
+
+Motivo: la app ya está abierta en la mano de quien está frente a la puerta. El turno extra de
+"di sí" convertía una orden directa en una conversación y retrasaba la apertura, que es justo lo
+que se quiere que sea rápido.
+
+Consecuencias asumidas de forma consciente:
+
+- **Ninguna** acción pide confirmación por voz: `open`, `close` y `stop` van directas al ESP32.
+- Un "sí", "dale" o "vale" **suelto ya no abre la puerta**. Antes `IntentAction.confirm` se mapeaba
+  a `open` porque solo aparecía como respuesta a una confirmación pendiente; sin confirmaciones,
+  ese mapeo convertiría un "sí" dicho al azar en una puerta abierta. Ver
+  `IntentAction.confirm => null` en `voice_controller.dart`.
+- La máquina de confirmación (`VoicePhase.pendingConfirm`) **se conserva** en el código, inactiva.
+  Recuperarla es cambiar `needsVoiceConfirmation` en `intent_lexer_es419.dart`.
+
+> El hardware no cambia. `open` sigue siendo `open` en el contrato GATT: el cambio es de política
+> de interacción en la app, no del protocolo.
+
+### Estado de la puerta reportado al usuario
+
+Frase obligatoria tras `open`: **"Puerta abierta."**
+Frase obligatoria tras `close`: **"Puerta cerrada."**
+
+El usuario pidió expresamente que la app hable solo del estado de la puerta y nada más, y que
+desapareciera el "Actuador en reposo", que le resultaba confuso.
+
+> **Salvedad honesta, asumida de forma consciente.** El MG995 no reporta posición y el ESP32 no
+> tiene sensor de puerta. "Puerta cerrada" significa por tanto **"el servo soltó el pestillo"**, no
+> "un sensor confirmó que la puerta está cerrada". Con el pestillo de resorte ambas cosas coinciden
+> casi siempre, pero no siempre. Si algún día hace falta el matiz exacto, la alternativa es decir
+> "Puerta liberada" / "Actuador en reposo". Está documentado aquí para que la decisión sea
+> consciente y no un descuido.
 
 ---
 
@@ -198,16 +257,27 @@ Frase obligatoria tras `close`: *"Actuador en reposo. Presiona la puerta para ce
 | Periodo PWM del servo | 50 Hz / 20 ms | `SERVO_FREQ_HZ` |
 | `status` periódico | 5000 ms | — |
 
-### El watchdog es de un solo disparo
+### El watchdog es de un solo disparo y solo vigila movimientos
 
 `abort()` es **asíncrono**: el servo tarda lo que tarden los milisegundos del regreso a `rest_us`.
 Si el watchdog volviera a llamar `abort()` en cada vuelta del `loop()`, reiniciaría el temporizador
 de movimiento y el servo **nunca** llegaría a reposo. Por eso `pollWatchdog()` dispara una vez por
 secuencia, igual que un lazo con su propia bandera.
 
-La desconexión BLE aplica la misma política y, por el mismo motivo, **no** marca fin de movimiento:
-mientras el brazo siga fuera de `rest_us` el watchdog tiene que seguir armado. Lo desarma el `done`
-que emite `tick()` cuando el retorno termina.
+Su condición es además **`_axis.moving()`**: solo aborta si hay un `PRESENTING` o un `RETURNING` en
+curso. Dos consecuencias, ambas deliberadas:
+
+- **Desconectar BLE no suelta el pestillo.** `onBleDisconnect()` no toca el eje. Si la puerta está
+  en `HOLDING` y el móvil se aleja o se cae la app, el servo se queda retraído. Cerrar es decisión de
+  la persona, no del transporte.
+- **El watchdog tampoco suelta el pestillo.** Armed se desarma en cuanto el `done` de `open` llega
+  (el `tick()` llama a `noteMovementEnd()`), y en `HOLDING` no hay movimiento que abortar aunque se
+rearme. La app manda `ping` cada 5 s mientras esté conectada, pero su ausencia ya no puede
+soltar el pestillo.
+
+> Riesgo consciente: si la puerta se queda abierta y a nadie la cierra, el pestillo sigue
+> retraído. Se acepta porque el modelo es una manija con resorte (la puerta no se autocierra) y
+> porque apagar la fuente del servo lo suelta.
 
 ---
 

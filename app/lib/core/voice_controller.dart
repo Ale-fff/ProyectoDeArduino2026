@@ -3,18 +3,21 @@
 /// Es la pieza que sostiene la seguridad del sistema, asi que no depende de
 /// BLE ni de Flutter mas alla de `ChangeNotifier`: se puede probar entera.
 ///
-/// Regla de confirmacion, simetrica:
+/// ## Confirmacion: retirada
 ///
-///   Se CONFIRMA lo que AUMENTA el riesgo.  ->  `open`
-///   Se EJECUTA de inmediato lo que lo REDUCE.  ->  `close`, `stop`
+/// Antes `open` exigia un "si" explicito (se confirmaba lo que AUMENTA el
+/// riesgo, se ejecutaba de inmediato lo que lo REDUCE). El usuario lo pidio
+/// cambiar: tener la app abierta en la mano ya es la intencion, y el turno de
+/// "di si" hacia la puerta mas lenta y mas frustrante de usar.
 ///
-/// `open` es la unica accion que lleva el servo a un estado no seguro, y por
-/// eso es la unica que exige un "si" explicito. Exigir confirmacion para
-/// devolver el actuador a reposo solo le pondria una barrera a la persona
-/// justo en la operacion que le conviene.
+/// `IntentAction.needsVoiceConfirmation` devuelve `false` para todas las
+/// acciones, asi que hoy [VoicePhase.pendingConfirm] no se alcanza. La maquina
+/// se conserva intacta y probada: recuperar el comportamiento viejo es cambiar
+/// una linea en `intent_lexer_es419.dart`.
 ///
 /// Durante [VoicePhase.executing] el microfono queda COMPLETAMENTE apagado:
 /// el ruido ambiente no puede disparar nada mientras el servo se mueve.
+library;
 
 import 'dart:async';
 
@@ -61,7 +64,7 @@ class VoiceDecision {
         match = null;
 
   final VoiceOutcome outcome;
-  final AppCommand? command;
+  final Command? command;
   final IntentMatch? match;
   final String message;
 }
@@ -82,16 +85,20 @@ enum VoiceOutcome {
 
 /// Frases de la app.
 ///
-/// Sobre hablar del ACTUADOR y no de la puerta: el MG995 no reporta posicion
-/// y el ESP32 no tiene sensor de puerta, asi que la app no puede afirmar con
-/// honestidad que la puerta esta cerrada. Solo puede decir que el actuador
-/// quedo en reposo.
+/// El usuario pidio que se hable solo del ESTADO DE LA PUERTA, abierta o
+/// cerrada, y nada mas. Se fue el "actuador en reposo": suena a averia y no
+/// dice nada que la persona no sepa.
+///
+/// Ojo con el formato, porque hay una trampa: el MG995 no reporta posicion y
+/// el ESP32 no tiene sensor de puerta. "Cerrada" aqui significa "el servo
+/// solto el pestillo", no "sensor confirme que la puerta esta cerrada". Quien
+/// quiera el matiz exacto, vuelve al texto anterior.
 class VoiceStrings {
   const VoiceStrings._();
 
   static const askOpen = 'Voy a abrir la puerta. Di "si" para confirmar.';
-  static const doneOpen = 'Puerta desbloqueada. Presiona la puerta para cerrarla.';
-  static const doneClose = 'Actuador en reposo. Presiona la puerta para cerrarla.';
+  static const doneOpen = 'Puerta abierta.';
+  static const doneClose = 'Puerta cerrada.';
   static const cancelled = 'Cancelado.';
   static const timedOut = 'No escuché respuesta. Cancelado.';
   static const repeat = 'No entendí. Repite, por favor.';
@@ -262,7 +269,7 @@ class VoiceController extends ChangeNotifier {
     _confirmTimer = null;
     _pendingAction = null;
     _phase = VoicePhase.idle;
-    _decide(const VoiceDecision.spoken(message));
+    _decide(VoiceDecision.spoken(message));
   }
 
   /// Traduce una intencion en un comando y pasa a fase de ejecucion.
@@ -271,7 +278,11 @@ class VoiceController extends ChangeNotifier {
       IntentAction.open => AppCommand.open,
       IntentAction.close => AppCommand.close,
       IntentAction.stop => AppCommand.estop,
-      IntentAction.confirm => AppCommand.open,
+      // Un "si" suelto NO abre. Antes solo aparecia como respuesta a una
+      // confirmacion y por eso podia mapearse a `open`. Sin confirmacion ya no
+      // hay nada que confirmar, y dejarlo como "abre" convertiria un "si"
+      // dicho al azar en una puerta abierta.
+      IntentAction.confirm => null,
       IntentAction.cancel => null,
       IntentAction.none => null,
     };

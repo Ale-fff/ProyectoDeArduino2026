@@ -77,7 +77,10 @@ void ServoAxis::applyPulse(uint16_t us) {
 // ---------------------------------------------------------------------------
 
 void ServoAxis::requestOpen() {
-    if (_moveActive || _state == AxisState::Holding) return;  // hay una secuencia en curso
+    // Se ignora si hay un movimiento en curso o si ya se esta sosteniendo: en
+    // ambos casos el servo ya va camino de press_us o esta ahi, y relanzar la
+    // secuencia solo reiniciaria el cronograma.
+    if (_moveActive || _state == AxisState::Holding) return;
     _seqComplete = false;
     _aborted     = false;
     _lastError   = ErrCode::None;
@@ -86,7 +89,10 @@ void ServoAxis::requestOpen() {
 }
 
 void ServoAxis::requestClose() {
-    if (_moveActive || _state == AxisState::Holding) return;
+    // Un movimiento en curso se respeta: no se interrumpe a mitad de trayecto.
+    // HOLDING, en cambio, SI se acepta, y es el caso normal tras un `open`:
+    // es el unico comando que devuelve el pestillo a reposo.
+    if (_moveActive) return;
     _seqComplete = false;
     _aborted     = false;
     _lastError   = ErrCode::None;
@@ -96,9 +102,10 @@ void ServoAxis::requestClose() {
         // Ya estaba en reposo: cerrar no requiere ninguna accion del servo.
         // La persona empuja la puerta y el pestillo se re-engancha solo.
         PV_LOG_PRINTLN("[servo] close: ya en reposo, dur_ms=0");
-        finish(ErrCode::None);
+        finish(ErrCode::None, AxisState::Idle);
         return;
     }
+    PV_LOG_PRINTLN("[servo] close: soltando la manija presionada");
     beginMove(clampUs(_cfg, _cfg.restUs), /*isReturn*/ true);
 }
 
@@ -136,7 +143,7 @@ void ServoAxis::abort() {
     // tiempo transcurrido desde el ultimo movimiento, en vez de 0.
     _aborted    = true;
     _seqStartMs = nowMs();
-    finish(ErrCode::None);
+    finish(ErrCode::None, AxisState::Idle);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,22 +166,28 @@ void ServoAxis::arrive() {
         // Volvimos a reposo: unico camino de salida normal del firmware.
         // Se preserva _lastError, que puede traer un STALL detectado durante
         // el PRESENTING que se acaba de abortar.
-        finish(_lastError);
+        finish(_lastError, AxisState::Idle);
     } else {
-        _state       = AxisState::Holding;
-        _holdStartMs = nowMs();
+        // Llegamos a press_us. Aqui termina la secuencia de `open`: la app ya
+        // puede decir "puerta abierta" y desbloquear el microfono para que
+        // acepte el `close`.
+        //
+        // Y aqui el servo SE QUEDA. No hay temporizador que lo suelte: el
+        // pestillo vuelve a reposo solo con `close` o `estop`.
+        finish(_lastError, AxisState::Holding);
     }
 }
 
-void ServoAxis::finish(ErrCode err) {
-    _state          = AxisState::Idle;
+void ServoAxis::finish(ErrCode err, AxisState nextState) {
+    _state          = nextState;
     _moveActive     = false;
     _lastError      = err;
     _lastDurationMs = nowMs() - _seqStartMs;
     _seqComplete    = true;
-    PV_LOG_PRINTF("[servo] fin err=%s dur_ms=%lu pos=%u us\n",
+    PV_LOG_PRINTF("[servo] fin err=%s dur_ms=%lu pos=%u us estado=%s\n",
                   errCodeName(err),
-                  static_cast<unsigned long>(_lastDurationMs), _simUs);
+                  static_cast<unsigned long>(_lastDurationMs), _simUs,
+                  axisStateName(_state));
 }
 
 // ---------------------------------------------------------------------------
@@ -185,12 +198,14 @@ void ServoAxis::task() {
     const uint32_t t = nowMs();
 
     // --- Sosteniendo la manija presionada ---
+    // Estado terminal y estable. No se hace NADA mientras el servo este aqui:
+    // no hay cuenta atras, no hay watchdog, no hay auto-retorno.
+    //
+    // Antes este bloque comparaba con _cfg.holdMs y soltaba solo. Eso
+    // contradecía el contrato de PROTOCOL.md y hacia que la puerta se
+    // cerrara por su cuenta mientras la persona ainda no habia cruzado.
     if (_state == AxisState::Holding) {
-        if (t - _holdStartMs >= _cfg.holdMs) {
-            // Tiempo cumplido: soltar. El retorno es a velocidad maxima para
-            // no estorbar el cierre de la puerta.
-            beginMove(clampUs(_cfg, _cfg.restUs), /*isReturn*/ true);
-        }
+        (void)t;
         return;
     }
 

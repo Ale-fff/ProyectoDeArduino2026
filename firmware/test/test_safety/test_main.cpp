@@ -26,14 +26,20 @@ ServoConfig testConfig() {
     return c;
 }
 
-// Recorre el reloj hasta que el eje quede ocioso, o hasta el limite dado.
+// Recorre el reloj hasta que el eje termine el movimiento en curso, o hasta el
+// limite dado.
+//
+// Usa moving() y NO busy() a proposito: desde que `open` deja el servo en
+// HOLDING, busy() se queda en true indefinidamente (es lo correcto: el pestillo
+// sigue presionado) y este helper no terminaria nunca.
 void runUntilIdle(ServoAxis& axis, uint32_t maxMs = 12000) {
     uint32_t elapsed = 0;
-    while (axis.busy() && elapsed < maxMs) {
+    while (axis.moving() && elapsed < maxMs) {
         tb_advance(10);
         axis.task();
         elapsed += 10;
     }
+    TEST_ASSERT_TRUE_MESSAGE(!axis.moving(), "el servo se quedo moviendo");
 }
 
 }  // namespace
@@ -61,7 +67,9 @@ void test_begin_deja_el_servo_en_reposo() {
     TEST_ASSERT_EQUAL(AxisState::Idle, axis.state());
 }
 
-void test_open_completa_la_secuencia_y_vuelve_a_reposo() {
+// Contrato actual: `open` termina la secuencia al LLEGAR a press_us y se queda
+// presionando. No hay ninguna temporizacion que lo suelte.
+void test_open_termina_la_secuencia_y_se_queda_presionando() {
     ServoAxis axis;
     axis.setConfig(testConfig());
     axis.begin();
@@ -75,45 +83,104 @@ void test_open_completa_la_secuencia_y_vuelve_a_reposo() {
     TEST_ASSERT_TRUE(axis.sequenceComplete());
     TEST_ASSERT_FALSE(axis.wasAborted());
     TEST_ASSERT_EQUAL(ErrCode::None, axis.lastError());
-    TEST_ASSERT_EQUAL(AxisState::Idle, axis.state());
-    // Invariante central: toda salida termina en restUs.
-    TEST_ASSERT_EQUAL_UINT16(1500, axis.positionUs());
+    TEST_ASSERT_EQUAL(AxisState::Holding, axis.state());
+    // Invariante central: tras un open el servo queda en press_us, NO en
+    // rest_us. Antes este test afirmaba lo contrario.
+    TEST_ASSERT_EQUAL_UINT16(1800, axis.positionUs());
 
-    // La duracion no se fija a un numero exacto porque depende del
-    // redondeo del paso del reloj simulado, pero tiene que contener el
-    // sostenimiento y el viaje de ida y vuelta.
-    const uint32_t travelMs =
-        ServoAxis::estimateTravelMs(1500, 1800) * 2u + 2u * SETTLE_MS;
-    TEST_ASSERT_TRUE_MESSAGE(axis.lastDurationMs() >= testConfig().holdMs + travelMs,
-                             "la duracion deberia cubrir el hold y los dos viajes");
-    TEST_ASSERT_TRUE_MESSAGE(axis.lastDurationMs() < testConfig().holdMs + MAX_MOVE_MS,
-                             "la duracion deberia ser acotada");
+    // La duracion es solo el viaje de ida: 276 ms = viaje(126) + asentar(150).
+    const uint32_t travelMs = ServoAxis::estimateTravelMs(1500, 1800) + SETTLE_MS;
+    TEST_ASSERT_TRUE_MESSAGE(axis.lastDurationMs() >= travelMs,
+                             "la duracion deberia cubrir el viaje de ida");
+    // Y la logica clave: hold_ms ya NO forma parte de nada. Si este test falla
+    // porque la duracion se alarga, es que alguien ha vuelto a colgar un
+    // temporizador de auto-soltado.
+    TEST_ASSERT_TRUE_MESSAGE(axis.lastDurationMs() < travelMs + 100,
+                             "hold_ms no deberia alargu la duracion de open");
 }
 
-void test_open_pasa_por_holding_antes_de_soltar() {
+// El `open` NO se auto-libera. Ni al doble de hold_ms, ni al triple.
+void test_open_no_se_libera_solo_pase_lo_que_pase() {
     ServoAxis axis;
     axis.setConfig(testConfig());
     axis.begin();
+
     axis.requestOpen();
-
-    // 276 ms = viaje(126) + asentar(150). Hay que pasar ese umbral.
-    tb_advance(300);
-    axis.task();
+    runUntilIdle(axis);
     TEST_ASSERT_EQUAL(AxisState::Holding, axis.state());
+    // sequenceComplete() es un latch que el router limpia al emitir el 'done'.
+    // Aqui se limpia a mano para poder comprobar que el paso del tiempo NO
+    // vuelve a ponerlo: si el servo se auto-libera, se abriria una secuencia.
+    axis.clearSequenceComplete();
 
-    // Durante el sostenimiento el servo sigue presionando.
-    tb_advance(1400);
+    // Muy por encima de hold_ms (1500). Antes de este cambio el servo ya
+    // habria vuelto a reposo, y este test habria atrapado la regresion.
+    tb_advance(testConfig().holdMs * 6u);
     axis.task();
     TEST_ASSERT_EQUAL(AxisState::Holding, axis.state());
     TEST_ASSERT_EQUAL_UINT16(1800, axis.positionUs());
 
-    // Pasado hold_ms, suelta.
-    tb_advance(200);
+    tb_advance(30000);
     axis.task();
+    TEST_ASSERT_EQUAL(AxisState::Holding, axis.state());
+    TEST_ASSERT_EQUAL_UINT16(1800, axis.positionUs());
+    TEST_ASSERT_FALSE_MESSAGE(axis.sequenceComplete(),
+                              "no debe reabrirse la secuencia sola");
+}
+
+// Este es el bug que motivo el cambio de contrato: `close` que llegaba desde
+// HOLDING se ignoraba, y el pestillo se quedaba presionado para siempre.
+void test_close_desde_holding_libera_el_pestillo() {
+    ServoAxis axis;
+    axis.setConfig(testConfig());
+    axis.begin();
+
+    axis.requestOpen();
+    runUntilIdle(axis);
+    TEST_ASSERT_EQUAL(AxisState::Holding, axis.state());
+    axis.clearSequenceComplete();
+
+    axis.requestClose();
     TEST_ASSERT_EQUAL(AxisState::Returning, axis.state());
 
     runUntilIdle(axis);
     TEST_ASSERT_EQUAL_UINT16(1500, axis.positionUs());
+    TEST_ASSERT_EQUAL(AxisState::Idle, axis.state());
+    TEST_ASSERT_TRUE(axis.sequenceComplete());
+    TEST_ASSERT_FALSE(axis.wasAborted());
+}
+
+// HOLDING es un estado estable: no es un "movimiento en curso". El watchdog se
+// apoya en moving() para no soltar el pestillo cuando el movil se desconecta,
+// asi que esta distincion es la que sostiene el contrato.
+void test_holding_no_cuenta_como_movimiento() {
+    ServoAxis axis;
+    axis.setConfig(testConfig());
+    axis.begin();
+
+    axis.requestOpen();
+    TEST_ASSERT_TRUE(axis.moving());
+
+    runUntilIdle(axis);
+    TEST_ASSERT_FALSE_MESSAGE(axis.moving(), "HOLDING no es un movimiento");
+    TEST_ASSERT_TRUE_MESSAGE(axis.busy(), "HOLDING si cuenta como ocupado");
+}
+
+// Un `open` repetido mientras ya se sostiene no debe relanzar la secuencia.
+void test_open_mientras_sostiene_se_ignora() {
+    ServoAxis axis;
+    axis.setConfig(testConfig());
+    axis.begin();
+
+    axis.requestOpen();
+    runUntilIdle(axis);
+    axis.clearSequenceComplete();
+
+    axis.requestOpen();
+    TEST_ASSERT_EQUAL(AxisState::Holding, axis.state());
+    TEST_ASSERT_FALSE_MESSAGE(axis.sequenceComplete(),
+                              "un open repetido no debe abrir otra secuencia");
+    TEST_ASSERT_EQUAL_UINT16(1800, axis.positionUs());
 }
 
 void test_stall_aborta_y_aunque_asu_retorna_a_reposo() {
@@ -337,8 +404,11 @@ int main(int, char**) {
     UNITY_BEGIN();
 
     RUN_TEST(test_begin_deja_el_servo_en_reposo);
-    RUN_TEST(test_open_completa_la_secuencia_y_vuelve_a_reposo);
-    RUN_TEST(test_open_pasa_por_holding_antes_de_soltar);
+    RUN_TEST(test_open_termina_la_secuencia_y_se_queda_presionando);
+    RUN_TEST(test_open_no_se_libera_solo_pase_lo_que_pase);
+    RUN_TEST(test_close_desde_holding_libera_el_pestillo);
+    RUN_TEST(test_holding_no_cuenta_como_movimiento);
+    RUN_TEST(test_open_mientras_sostiene_se_ignora);
     RUN_TEST(test_stall_aborta_y_aunque_asu_retorna_a_reposo);
     RUN_TEST(test_estop_durante_el_sostenimiento_libera_la_manija);
     RUN_TEST(test_estop_en_reposo_cierra_la_secuencia_al_igual);

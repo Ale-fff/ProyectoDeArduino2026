@@ -20,12 +20,18 @@ extension IntentActionInfo on IntentAction {
         IntentAction.stop => 'stop',
       };
 
-  /// La app solo pide confirmacion en voz para lo que lleva el servo a un
-  /// estado NO seguro. `open` es la unica.
+  /// Que accion exige un "si" de voz antes de ejecutarse.
   ///
-  /// La regla es simetrica: se confirma lo que AUMENTA el riesgo y se ejecuta
-  /// de inmediato lo que lo REDUCE. Por eso `close` y `stop` no preguntan.
-  bool get needsVoiceConfirmation => this == IntentAction.open;
+  /// Ahora ninguna. La app se abre en la mano de quien ya esta frente a la
+  /// puerta, asi que pedir confirmacion para abrir solo anade un turno de
+  /// conversacion: la persona oye "di si", contesta "si" y oye "puerta
+  /// desbloqueada" para un movimiento que ella ya habia pedido.
+  ///
+  /// La maquina de confirmacion sigue en pie por si vuelve a hacer falta (ver
+  /// `VoicePhase.pendingConfirm`); lo que se retiro fue la DECISION de usarla.
+  ///
+  /// Quien quiera recuperarla: `this == IntentAction.open`.
+  bool get needsVoiceConfirmation => false;
 }
 
 /// Un grupo de sinonimos que comparten intencion.

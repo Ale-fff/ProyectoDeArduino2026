@@ -114,7 +114,8 @@ void main() {
     });
 
     test('casi iguales da un valor alto', () {
-      expect(similarity('abre', 'abree'), greaterThan(0.8));
+      // 1 error de edicion sobre la palabra mas larga: 1 - 1/5 = 0.8 exacto.
+      expect(similarity('abre', 'abree'), greaterThanOrEqualTo(0.8));
     });
   });
 }

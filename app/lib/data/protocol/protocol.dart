@@ -2,6 +2,7 @@
 ///
 /// Si tocas algo aca, actualiza tambien PROTOCOL.md,
 /// `firmware/include/protocol.h` y `firmware/src/command_router.cpp`.
+library;
 
 import 'dart:convert';
 

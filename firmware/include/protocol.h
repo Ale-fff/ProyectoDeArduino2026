@@ -115,6 +115,9 @@ struct ServoConfig {
     uint16_t maxUs;
     uint16_t restUs;   // estado seguro
     uint16_t pressUs;  // manija presionada
+    // Se publica y se valida por compatibilidad con el contrato, pero el
+    // firmware NO lo usa: el pestillo se suelta con `close` o `estop`, nunca
+    // por tiempo. Ver servo_axis.h, regla 3.
     uint16_t holdMs;
     bool     calibrated;
 };

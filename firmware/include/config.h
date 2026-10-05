@@ -61,8 +61,13 @@ static constexpr uint16_t DEFAULT_REST_US  = 1500;  // estado seguro
 static constexpr uint16_t DEFAULT_PRESS_US = 1800;  // manija presionada
 static constexpr uint16_t DEFAULT_HOLD_MS  = 1500;
 
-// Rango admitido para hold_ms. El piso es corto a proposito: el servo tiene que
-// soltar la manija rapido para no estorbar el cierre de la puerta.
+// Rango admitido para hold_ms.
+//
+// OJO: hold_ms ya NO governa cuando se suelta el pestillo. Se conserva porque
+// forma parte del contrato publicado en `config` y la app lo lee, pero el
+// servo se queda presionado hasta que llega un `close` o un `estop`. Estos
+// limites se siguen validando para no romper el contrato, no porque el firmware
+// los use para calcular nada.
 static constexpr uint16_t HOLD_MS_MIN = 300;
 static constexpr uint16_t HOLD_MS_MAX = 3000;
 

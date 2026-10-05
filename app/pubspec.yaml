@@ -4,11 +4,12 @@ publish_to: none
 version: 1.0.0+1
 
 environment:
-  # Dart 3.3 es el minimo porque el matcher usa switch expressions.
-  sdk: '>=3.3.0 <4.0.0'
-  # Flutter 3.22 es el minimo porque la UI usa ColorScheme.surfaceContainerHighest
-  # y Material 3 con surfaceContainer*.
-  flutter: '>=3.22.0'
+  # Los minimos los imponen los plugins, no el codigo de la app:
+  # speech_to_text 7.5.0 exige Dart 3.12 / Flutter 3.44. Declarar menos hace
+  # que pub resuelva versiones antiguas del plugin en otro equipo y el fallo
+  # aparece al compilar, no al resolver.
+  sdk: '>=3.12.0 <4.0.0'
+  flutter: '>=3.44.0'
 
 dependencies:
   flutter:
@@ -26,6 +27,10 @@ dependencies:
   # ser usable sin mirar la pantalla.
   flutter_tts: ^4.2.0
 
+  # Reproduccion de MP3 incluidos en el proyecto. El TTS depende de que el
+  # movil tenga voces instaladas; un clip grabado siempre suena igual.
+  audioplayers: ^6.1.0
+
   # Permisos en runtime (microfono, bluetooth).
   permission_handler: ^12.0.0
 
@@ -36,3 +41,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    # Frases grabadas que no pueden depender del motor de voz.
+    - Audio/no_entendi.mp3

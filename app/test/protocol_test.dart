@@ -6,20 +6,20 @@ import 'package:puertavoz/data/protocol/protocol.dart';
 void main() {
   group('Command.encode', () {
     test('open produce una sola linea sin saltos', () {
-      final json = Command(AppCommand.open, 42).encode();
+      final json = const Command(AppCommand.open, 42).encode();
       expect(json, '{"cmd":"open","seq":42}');
       expect(json.contains('\n'), isFalse);
     });
 
     test('los nombres de comando coinciden con el firmware', () {
-      expect(Command(AppCommand.open, 1).encode(), contains('"open"'));
-      expect(Command(AppCommand.close, 1).encode(), contains('"close"'));
-      expect(Command(AppCommand.getConfig, 1).encode(), contains('"get_config"'));
-      expect(Command(AppCommand.saveConfig, 1).encode(), contains('"save_config"'));
+      expect(const Command(AppCommand.open, 1).encode(), contains('"open"'));
+      expect(const Command(AppCommand.close, 1).encode(), contains('"close"'));
+      expect(const Command(AppCommand.getConfig, 1).encode(), contains('"get_config"'));
+      expect(const Command(AppCommand.saveConfig, 1).encode(), contains('"save_config"'));
     });
 
     test('save_config solo incluye los campos presentes', () {
-      final c = Command(AppCommand.saveConfig, 7, pressUs: 1800, restUs: 1500);
+      final c = const Command(AppCommand.saveConfig, 7, pressUs: 1800, restUs: 1500);
       final json = c.encode();
       expect(json, contains('"press_us":1800'));
       expect(json, contains('"rest_us":1500'));
@@ -28,12 +28,12 @@ void main() {
     });
 
     test('calibrate incluye el modo', () {
-      final c = Command(AppCommand.calibrate, 8, mode: 'sweep');
+      final c = const Command(AppCommand.calibrate, 8, mode: 'sweep');
       expect(c.encode(), '{"cmd":"calibrate","seq":8,"mode":"sweep"}');
     });
 
     test('nunca supera el limite de 240 bytes del contrato', () {
-      final c = Command(
+      final c = const Command(
         AppCommand.saveConfig,
         65535,
         pressUs: 2100,

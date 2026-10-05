@@ -164,11 +164,17 @@ class IntentMatcher {
     // Prefijo comun: "abre" contra "abree" o "abriendo", "cierra" contra
     // "cerrala".
     //
-    // Exige al menos 4 caracteres compartidos. Sin ese minimo, "si" (2 letras)
+    // El verbo del lexico tiene que ser PREFIJO del token, no limitarse a
+    // compartir los primeros caracteres. Compartir 4 letras hacia dos falsos
+    // positivos muy molestos: "hace" contra "hacerlo" hacia que "que tiempo
+    // hace" confirme, y "abrio" contra "abrir" hacia que "nadie me abrio" abra
+    // la puerta. Los dos verbos existen en espanol y ninguno es una orden, asi
+    // que la regla mira el final de la palabra, no su arranque.
+    //
+    // Sigue exigiendo al menos 4 caracteres. Sin ese minimo, "si" (2 letras)
     // emparejaria por prefijo con "sino", "silla" o "situado", y cualquier
     // palabra que empiece por 'no' o 'ya' se convertiria en una orden.
-    final shared = _sharedPrefixLength(token, verb);
-    if (shared >= kMinPrefixLength) return 0.88;
+    if (verb.length >= kMinPrefixLength && token.startsWith(verb)) return 0.88;
 
     // Similitud difusa para el resto.
     final sim = similarity(token, verb);
@@ -177,15 +183,6 @@ class IntentMatcher {
       return 0.65 + ((sim - 0.82) / 0.18) * 0.22;
     }
     return 0;
-  }
-
-  int _sharedPrefixLength(String a, String b) {
-    final n = a.length < b.length ? a.length : b.length;
-    var i = 0;
-    while (i < n && a.codeUnitAt(i) == b.codeUnitAt(i)) {
-      i++;
-    }
-    return i;
   }
 
   /// Los verbos del lexico estan en minúsculas y sin tildes. Se limpian igual

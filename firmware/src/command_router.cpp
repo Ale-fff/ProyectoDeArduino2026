@@ -41,17 +41,22 @@ void CommandRouter::emitAck(uint16_t seq, const char* action, AxisState st) {
 void CommandRouter::emitDone(uint16_t seq, const char* action, uint32_t durMs,
                              const char* note) {
     char buf[192];
+    // El estado va en el payload porque `open` ya no termina en reposo: su
+    // 'done' llega con state="HOLDING", que es exactamente lo que la app
+    // necesita para unlockear el microfono y aceptar el `close`. Antes aqui
+    // se escribia "REST" a pelo, y para un open habria sido mentira.
+    const char* state = axisStateName(_axis.state());
     if (note && *note) {
         snprintf(buf, sizeof(buf),
-                 "{\"ev\":\"done\",\"seq\":%u,\"action\":\"%s\",\"state\":\"REST\","
+                 "{\"ev\":\"done\",\"seq\":%u,\"action\":\"%s\",\"state\":\"%s\","
                  "\"dur_ms\":%lu,\"note\":\"%s\"}",
-                 static_cast<unsigned>(seq), action,
+                 static_cast<unsigned>(seq), action, state,
                  static_cast<unsigned long>(durMs), note);
     } else {
         snprintf(buf, sizeof(buf),
-                 "{\"ev\":\"done\",\"seq\":%u,\"action\":\"%s\",\"state\":\"REST\","
+                 "{\"ev\":\"done\",\"seq\":%u,\"action\":\"%s\",\"state\":\"%s\","
                  "\"dur_ms\":%lu}",
-                 static_cast<unsigned>(seq), action,
+                 static_cast<unsigned>(seq), action, state,
                  static_cast<unsigned long>(durMs));
     }
     emit(buf);
@@ -251,7 +256,23 @@ bool CommandRouter::pollWatchdog() {
     if (_watchdogFired) return false;          // un disparo por secuencia
     if (!_safety.watchdogExpired()) return false;
 
-    PV_LOG_PRINTLN("[safety] watchdog: sin ping, retorno a reposo");
+    // El watchdog vigila MOVIMIENTOS, no el pestillo sostenido. Sin este
+    // guardia, abrir la puerta y alejar el movil (o que se caiga la app)
+    // devolveria el servo a reposo 30 s mas tarde por su cuenta, que es justo
+    // lo que el contrato nuevo prohibe.
+    //
+    // En HOLDING el servo ya esta en su sitio: no hay nada a lo que vigilar, y
+    // un `close` explicito sigue siendo el unico modo de soltarlo, junto con
+    // `estop`.
+    if (!_axis.moving()) {
+        // Se desarma: no hay nada que abortar y no queremos que dispare mas
+        // tarde si el servo se mueve por otra causa.
+        _safety.noteMovementEnd();
+        _watchdogFired = true;
+        return false;
+    }
+
+    PV_LOG_PRINTLN("[safety] watchdog: sin ping durante el movimiento, retorno a reposo");
     // Ahora mismo el servo puede estar en medio de un PRESENTING. abort() lo
     // manda a reposo, pero esa vuelta tiene su propia duracion: si se
     // volviera a llamar abort() en cada tick, reiniciaria el temporizador de

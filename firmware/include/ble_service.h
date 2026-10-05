@@ -19,6 +19,12 @@ using DisconnectHook = void (*)(void* user);
 
 void begin(CommandRouter& router, DisconnectHook onDisconnect, void* user);
 
+// Hay que llamar a esto desde loop(). Reanuda el anuncio si el cliente se
+// desconectó. No se hace dentro del callback de desconexión a propósito:
+// compite con el desmontaje de la conexión y falla en silencio, dejando el
+// módulo invisible hasta reiniciar el ESP.
+void service();
+
 bool isConnected();
 
 }  // namespace BleService

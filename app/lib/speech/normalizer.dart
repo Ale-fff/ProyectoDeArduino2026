@@ -53,7 +53,12 @@ const Set<String> _fillerWords = <String>{
   // relleno
   'me', 'mi', 'a', 'al', 'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
   'de', 'del', 'y', 'o', 'u', 'e',
-  'ahora', 'ya', 'luego', 'entonces', 'bien', 'ok', 'va',
+  // 'ok' y 'va' NO van aqui: 'ok' es sinonimo de confirmacion en el lexico y
+  // 'va' forma parte de 'vamos'. Si se filtran antes de puntuar, nunca se
+  // emparejan con su verbo.
+  'ahora', 'ya', 'luego', 'entonces', 'bien',
+  // saludos completos: "buenos dias", "buenas tardes"
+  'dias', 'tardes', 'noches',
   'solito', 'solita',
 };
 

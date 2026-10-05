@@ -19,6 +19,7 @@ BLECharacteristic* s_tx       = nullptr;  // eventos hacia la app
 BLECharacteristic* s_rx       = nullptr;  // comandos de la app
 BLEService*        s_service  = nullptr;
 bool               s_connected = false;
+bool               s_needsAdvertise = false;
 
 CommandRouter* s_router      = nullptr;
 BleService::DisconnectHook s_onDisconnect = nullptr;
@@ -56,6 +57,11 @@ class ServerCallbacksImpl : public BLEServerCallbacks {
         PV_LOG_PRINTLN("[ble] cliente desconectado");
         // Nunca dejar el servo presionando la manija sin supervision.
         if (s_onDisconnect) s_onDisconnect(s_hookUser);
+        // NO reanudar el anuncio aqui: llamar a startAdvertising() dentro del
+        // callback compite con el desmontaje de la conexion en el stack, falla
+        // en silencio y el modulo deja de anunciarse (desaparece de la app
+        // hasta reiniciar). BleService::service() lo reanuda desde loop().
+        s_needsAdvertise = true;
     }
 };
 
@@ -109,11 +115,25 @@ void begin(CommandRouter& router, DisconnectHook onDisconnect, void* user) {
     s_rx->setCallbacks(new RxCallbacksImpl());
 
     s_service->start();
+    // CRITICO: el anuncio por defecto del core NO lleva el UUID de servicio
+    // (service_uuid_len=0 en el ctor de BLEAdvertising). Sin addServiceUUID,
+    // el escaneo por servicio de la app sale vacio y el modulo es invisible.
+    // setScanResponse deja el nombre en la respuesta de escaneo.
+    BLEAdvertising* adv = BLEDevice::getAdvertising();
+    adv->addServiceUUID(SERVICE_UUID);
+    adv->setScanResponse(true);
     BLEDevice::startAdvertising();
 
     PV_LOG_PRINTF("[ble] anunciando como %s  (servicio %s)\n", name.c_str(), SERVICE_UUID);
 }
 
 bool isConnected() { return s_connected; }
+
+void service() {
+    if (!s_needsAdvertise) return;
+    s_needsAdvertise = false;
+    BLEDevice::getAdvertising()->start();
+    PV_LOG_PRINTLN("[ble] reanunciando");
+}
 
 }  // namespace BleService

@@ -3,6 +3,23 @@ import 'package:puertavoz/core/voice_controller.dart';
 import 'package:puertavoz/data/protocol/protocol.dart';
 import 'package:puertavoz/speech/intent_lexer_es419.dart';
 
+/// Un turno completo de voz contra un controlador concreto.
+void utterOn(VoiceController c, String phrase) {
+  c.beginListening();
+  c.onSpeechResult(<String>[phrase]);
+}
+
+/// Pruebas de la maquina de voz.
+///
+/// La confirmacion se retiro a proposito: `open` ya no pide un "si". Los
+/// grupos que cubren la confirmacion antigua se reescribieron para fijar el
+/// comportamiento NUEVO, no para borrarlos.
+///
+/// Nota sobre la cobertura que ya no existe: `VoicePhase.pendingConfirm` es
+/// inalcanzable por la API publica mientras `needsVoiceConfirmation` sea
+/// `false`, asi que sus ramas (`_handleConfirmation`, el timeout) no tienen
+/// pruebas. Siguen escritas y compiladas; si se reactiva la confirmacion hay
+/// que recuperar esos tests.
 void main() {
   late VoiceController v;
 
@@ -17,130 +34,113 @@ void main() {
     return d.outcome == VoiceOutcome.command ? d.command!.cmd : null;
   }
 
-  group('abrir exige confirmacion', () {
-    test('"abre la puerta" solo pregunta, no mueve el servo', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
+  /// Atajo de la forma que ahora usa la persona: un toque, una frase, y ya.
+  void utter(String phrase) => utterOn(v, phrase);
 
-      expect(v.phase, VoicePhase.pendingConfirm);
-      expect(issuedCommand(), isNull,
-          reason: 'NUNCA se debe mover el servo sin un "si" explicito');
-      expect(v.lastDecision.outcome, VoiceOutcome.spoken);
-      expect(v.lastDecision.message, VoiceStrings.askOpen);
-    });
+  group('abrir se ejecuta de inmediato', () {
+    test('"abre la puerta" mueve el servo sin preguntar nada', () {
+      utter('abre la puerta');
 
-    test('"si" confirma y emite open', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['si']);
-
-      expect(v.phase, VoicePhase.executing);
       expect(issuedCommand(), AppCommand.open);
+      expect(v.phase, VoicePhase.executing);
       expect(v.lastDecision.command!.seq, greaterThan(0));
     });
 
-    test('variantes de "si" tambien confirman', () {
-      for (final ok in <String>['si', 'dale', 'claro', 'vale', 'ok', 'adelante', 'hecho']) {
+    test('no hace falta un "si" detras', () {
+      utter('abre la puerta');
+      expect(issuedCommand(), AppCommand.open);
+      expect(v.phase, VoicePhase.executing,
+          reason: 'tiene que ejecutar en el primer turno, no quedarse esperando');
+    });
+
+    test('variantes de "abre" tambien ejecutan solas', () {
+      for (final phrase in <String>[
+        'abre',
+        'abreme la puerta',
+        'abre la puerta por favor',
+      ]) {
         final c = VoiceController();
         c.beginListening();
-        c.onSpeechResult(<String>['abre la puerta']);
-        c.onSpeechResult(<String>[ok]);
-        expect(c.lastDecision.outcome, VoiceOutcome.command,
-            reason: '"$ok" deberia confirmar');
-        expect(c.lastDecision.command!.cmd, AppCommand.open);
+        c.onSpeechResult(<String>[phrase]);
+        expect(c.lastDecision.outcome, VoiceOutcome.command, reason: '"$phrase"');
+        expect(c.lastDecision.command!.cmd, AppCommand.open, reason: '"$phrase"');
+        c.dispose();
+      }
+    });
+
+    test('un "si" suelto NO abre la puerta', () {
+      // Sin confirmacion ya no hay nada que confirmar. Tratar "si" como
+      // "abre" seria abrir la puerta por una respuesta a nada.
+      for (final phrase in <String>['si', 'dale', 'claro', 'vale', 'adelante', 'hecho']) {
+        final c = VoiceController();
+        utterOn(c, phrase);
+        expect(c.lastDecision.outcome, isNot(VoiceOutcome.command),
+            reason: '"$phrase" no debe emitir ningun comando');
+        expect(c.lastDecision.command, isNull, reason: '"$phrase"');
         c.dispose();
       }
     });
   });
 
-  group('cancelar', () {
-    test('"no" cancela y no emite nada', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['no']);
+  group('lo que se dice y no es una orden', () {
+    test('"no" no emite nada', () {
+      utter('no');
 
+      expect(issuedCommand(), isNull);
       expect(v.phase, VoicePhase.idle);
-      expect(issuedCommand(), isNull);
-      expect(v.lastDecision.message, VoiceStrings.cancelled);
     });
 
-    test('"olvidalo" tambien cancela', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['olvidalo']);
+    test('"olvidalo" no emite nada', () {
+      utter('olvidalo');
       expect(issuedCommand(), isNull);
     });
 
-    test('una frase que no se entiende cancela la confirmacion', () {
-      // Es lo correcto: si no entendemos, no asumimos que queria decir "si".
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['que tiempo hace']);
-      expect(v.phase, VoicePhase.idle);
+    test('"pon la musica" no mueve el servo', () {
+      utter('pon la musica');
+
       expect(issuedCommand(), isNull);
-    });
-
-    test('el timeout cancela solo', () {
-      v = VoiceController(confirmWindow: const Duration(milliseconds: 50));
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      expect(v.phase, VoicePhase.pendingConfirm);
-
-      return Future<void>.delayed(const Duration(milliseconds: 120), () {
-        expect(v.phase, VoicePhase.idle);
-        expect(issuedCommand(), isNull);
-        expect(v.lastDecision.message, VoiceStrings.timedOut);
-      });
+      expect(v.lastDecision.outcome, VoiceOutcome.askToRepeat);
     });
   });
 
-  group('lo que reduce el riesgo se ejecuta de inmediato', () {
-    test('"cierra la puerta" no pide confirmacion', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['cierra la puerta']);
-
+  group('cerrar y parar siguen siendo directos', () {
+    test('"cierra la puerta"', () {
+      utter('cierra la puerta');
       expect(issuedCommand(), AppCommand.close);
       expect(v.phase, VoicePhase.executing);
     });
 
-    test('"para" no pide confirmacion', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['para']);
+    test('"para"', () {
+      utter('para');
       expect(issuedCommand(), AppCommand.estop);
     });
 
-    test('"alto" corta una confirmacion pendiente y actua ya', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      expect(v.phase, VoicePhase.pendingConfirm);
-
-      v.onSpeechResult(<String>['alto']);
-      expect(issuedCommand(), AppCommand.estop,
-          reason: 'una parada nunca debe quedar trabada en una confirmacion');
+    test('"alto"', () {
+      utter('alto');
+      expect(issuedCommand(), AppCommand.estop);
     });
   });
 
   group('microfono bloqueado durante la ejecucion', () {
     test('una orden durante la ejecucion se ignora', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['si']);
+      utter('abre la puerta');
       expect(v.phase, VoicePhase.executing);
+      final first = v.lastDecision.command!.seq;
 
       // Ruido ambiente o voz involuntary: no puede pasar nada.
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['no']);
+      utter('abre la puerta');
+      utter('cierra la puerta');
 
       expect(v.phase, VoicePhase.executing,
           reason: 'el microfono tiene que seguir apagado hasta onSequenceFinished');
       expect(issuedCommand(), AppCommand.open,
           reason: 'no se puede emitir un segundo comando encima del primero');
+      expect(v.lastDecision.command!.seq, first,
+          reason: 'el seq del primer comando no debe cambiar');
     });
 
     test('el microfono vuelve a estar disponible al terminar', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['si']);
+      utter('abre la puerta');
       v.onSequenceFinished();
 
       expect(v.phase, VoicePhase.idle);
@@ -148,24 +148,20 @@ void main() {
     });
   });
 
-  group('la persona se impacienta', () {
-    test('repetir la orden vuelve a preguntar, no ejecuta', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['abre']);
+  group('repetir la orden', () {
+    test('insiste hasta que se entienda y ejecuta una sola vez', () {
+      utter('pon la musica');
+      expect(issuedCommand(), isNull);
 
-      expect(v.phase, VoicePhase.pendingConfirm);
-      expect(issuedCommand(), isNull,
-          reason: 'repetir la orden no es consentir');
-      expect(v.lastDecision.message, VoiceStrings.askOpen);
+      utter('abre la puerta');
+      expect(issuedCommand(), AppCommand.open);
+      expect(v.phase, VoicePhase.executing);
     });
   });
 
   group('lo que no se entiende', () {
     test('pide repetir en vez de adivinar', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['pon la musica']);
+      utter('pon la musica');
 
       expect(v.lastDecision.outcome, VoiceOutcome.askToRepeat);
       expect(issuedCommand(), isNull);
@@ -180,15 +176,15 @@ void main() {
         'el tiempo',
         'abre la puerta por favor',
       ]);
-      expect(v.phase, VoicePhase.pendingConfirm);
+
+      expect(issuedCommand(), AppCommand.open);
+      expect(v.phase, VoicePhase.executing);
     });
   });
 
   group('errores de transporte', () {
     test('dejan el control en manos de la persona', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['si']);
+      utter('abre la puerta');
       expect(v.phase, VoicePhase.executing);
 
       v.onTransportError(VoiceStrings.notConnected);
@@ -200,15 +196,11 @@ void main() {
 
   group('los numeros de seq nunca se repiten', () {
     test('dos abres seguidos usan seq distintos', () {
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['si']);
+      utter('abre la puerta');
       final first = v.lastDecision.command!.seq;
 
       v.onSequenceFinished();
-      v.beginListening();
-      v.onSpeechResult(<String>['abre la puerta']);
-      v.onSpeechResult(<String>['si']);
+      utter('abre la puerta');
       final second = v.lastDecision.command!.seq;
 
       expect(second, greaterThan(first),
@@ -216,13 +208,49 @@ void main() {
     });
   });
 
+  group('frases de la puerta', () {
+    test('se habla solo de abrir y cerrar, sin mencionar el actuador', () {
+      // El usuario quito "Actuador en reposo" por confuso: no dice nada que la
+      // persona no sepa. Estas pruebas son el candado para que no vuelva.
+      expect(VoiceStrings.doneOpen.toLowerCase(), 'puerta abierta.');
+      expect(VoiceStrings.doneClose.toLowerCase(), 'puerta cerrada.');
+
+      for (final s in <String>[
+        VoiceStrings.doneOpen,
+        VoiceStrings.doneClose,
+        VoiceStrings.repeat,
+        VoiceStrings.notConnected,
+      ]) {
+        expect(s.toLowerCase(), isNot(contains('actuador')),
+            reason: '"$s" no debe hablar del actuador');
+        expect(s.toLowerCase(), isNot(contains('reposo')),
+            reason: '"$s" no debe hablar de reposo');
+      }
+    });
+
+    test('ninguna frase se alarga con instrucciones de pulsar', () {
+      for (final s in <String>[
+        VoiceStrings.doneOpen,
+        VoiceStrings.doneClose,
+      ]) {
+        expect(s.toLowerCase(), isNot(contains('presiona')),
+            reason: '"$s" no debe pedir hacer nada mas');
+      }
+    });
+  });
+
   group('regla de confirmacion declarada', () {
-    test('solo open la exige', () {
-      expect(IntentAction.open.needsVoiceConfirmation, isTrue);
-      expect(IntentAction.close.needsVoiceConfirmation, isFalse);
-      expect(IntentAction.stop.needsVoiceConfirmation, isFalse);
-      expect(IntentAction.confirm.needsVoiceConfirmation, isFalse);
-      expect(IntentAction.cancel.needsVoiceConfirmation, isFalse);
+    test('ninguna accion exige confirmacion', () {
+      for (final action in IntentAction.values) {
+        expect(action.needsVoiceConfirmation, isFalse,
+            reason: '$action no debe pedir confirmacion');
+      }
+    });
+
+    test('la maquina de confirmacion sigue disponible por si se reactiva', () {
+      // No se borro el soporte: solo se dejo de usar. Si algun dia vuelve,
+      // basta cambiar `needsVoiceConfirmation` en el lexico.
+      expect(VoicePhase.values, contains(VoicePhase.pendingConfirm));
     });
   });
 }

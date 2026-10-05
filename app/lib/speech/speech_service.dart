@@ -13,11 +13,12 @@ library;
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 class SpeechService extends ChangeNotifier {
   SpeechService({SpeechToText? engine, this.localeId = 'es_ES'})
-      : _engine = engine ?? SpeechToText();
+    : _engine = engine ?? SpeechToText();
 
   final SpeechToText _engine;
   final String localeId;
@@ -58,6 +59,8 @@ class SpeechService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // El idioma NO va aqui: desde 7.5.0 `initialize` no lo acepta. Se pasa
+      // en cada `listen()` con SpeechListenOptions.localeId.
       _available = await _engine.initialize(
         onError: (e) {
           _lastError = e.errorMsg;
@@ -95,26 +98,29 @@ class SpeechService extends ChangeNotifier {
     if (_listening) return true;
 
     try {
-      final ok = await _engine.listen(
+      // Desde speech_to_text 7.5.0 `listen()` no devuelve nada: el exito se
+      // consulta con `isListening`. Leer el valor de retorno daria null y
+      // reventaria al devolverlo como bool.
+      await _engine.listen(
         onResult: _onResult,
-        // Corto: la persona habla una orden corta. Escuchar mas tiempo solo
-        // capta ruido y hace mas lenta la respuesta.
-        listenFor: const Duration(seconds: 6),
-        pauseFor: const Duration(seconds: 3),
-        localeId: localeId,
         listenOptions: SpeechListenOptions(
+          // Corto: la persona habla una orden corta. Escuchar mas tiempo solo
+          // capta ruido y hace mas lenta la respuesta.
+          listenFor: const Duration(seconds: 6),
+          pauseFor: const Duration(seconds: 3),
+          localeId: localeId,
           partialResults: false,
           // Con ondevice=false el motor usa la red. En un sitio sin datos la
           // app se queda muda, asi que se deja que el sistema decida.
           onDevice: false,
         ),
       );
-      _listening = ok;
-      if (!ok) {
+      _listening = _engine.isListening;
+      if (!_listening) {
         _lastError = 'No se pudo iniciar el microfono. Revisa el permiso.';
       }
       notifyListeners();
-      return ok;
+      return _listening;
     } catch (e) {
       _lastError = 'No se pudo acceder al microfono: $e';
       _listening = false;
@@ -127,7 +133,8 @@ class SpeechService extends ChangeNotifier {
     if (!result.finalResult) return;
     stop();
 
-    final hypotheses = result.recognitionResult
+    final hypotheses = result.alternates
+        .map((w) => w.recognizedWords)
         .where((s) => s.trim().isNotEmpty)
         .toList(growable: false);
     if (hypotheses.isEmpty) {
