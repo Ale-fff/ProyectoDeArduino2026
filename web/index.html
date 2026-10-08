@@ -3,25 +3,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ManejIA - Asistente Domótico por Voz</title>
+  <title>ManejIA | Asistente Domótico por Voz para Puertas - ESP32-S3 & BLE</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <!-- Header / Barra de Navegación -->
+<body class="dark-iot-theme">
+  <!-- Glowing Ambient Background Canvas -->
+  <div class="ambient-glow ambient-glow-top"></div>
+  <div class="ambient-glow ambient-glow-bottom"></div>
+  <div class="grid-overlay"></div>
+
+  <!-- Header / Barra de Navegación Técnica -->
   <header class="header">
     <div class="container nav-container">
       <div class="logo">
-        <span class="logo-icon">🎙️</span>
-        <span class="logo-text">ManejIA</span>
+        <div class="logo-badge">
+          <span class="logo-icon">🎙️</span>
+          <span class="logo-led-pulse"></span>
+        </div>
+        <div class="logo-text-group">
+          <span class="logo-text">ManejIA</span>
+          <span class="logo-subtext">ESP32-S3 // IoT DOMOTICS</span>
+        </div>
       </div>
+
+      <!-- Telemetry System Status Pill -->
+      <div class="nav-telemetry">
+        <span class="pulse-dot"></span>
+        <span class="telemetry-label">SYSTEM ONLINE:</span>
+        <span class="telemetry-val">BLE v5.0 READY</span>
+      </div>
+
       <nav class="nav-links">
-        <a href="#caracteristicas">Características</a>
-        <a href="#como-funciona">Funcionamiento</a>
-        <a href="#especificaciones">Hardware</a>
-        <a href="#descarga" class="btn btn-primary btn-sm">Descargar App</a>
+        <a href="#caracteristicas" class="nav-link"><span class="nav-num">01.</span> Características</a>
+        <a href="#como-funciona" class="nav-link"><span class="nav-num">02.</span> Pipeline</a>
+        <a href="#especificaciones" class="nav-link"><span class="nav-num">03.</span> Hardware</a>
+        <a href="#descarga" class="btn btn-cyber-sm">
+          <span class="btn-glow-line"></span>
+          <span>Descargar APK</span>
+          <span class="btn-arrow">→</span>
+        </a>
       </nav>
     </div>
   </header>
@@ -31,193 +54,484 @@
     <section class="hero">
       <div class="container hero-grid">
         <div class="hero-content">
-          <span class="badge">Control Domótico No Invasivo</span>
-          <h1>Abre puertas con tu voz de forma simple y segura</h1>
+          <div class="tech-tag-row">
+            <span class="tech-tag tech-tag-pulse">
+              <span class="tag-indicator"></span> NODO IOT DOMÓTICO
+            </span>
+            <span class="tech-tag">FIRMWARE v1.0.0</span>
+            <span class="tech-tag">MG995 · 11 KG·CM</span>
+          </div>
+
+          <h1 class="hero-title">
+            Control de Acceso por <span class="gradient-text">Comandos de Voz</span> para ESP32-S3
+          </h1>
+
           <p class="hero-description">
-            ManejIA es la solución integral que conecta tu teléfono inteligente con un actuador ESP32-S3 y un servomotor MG995. Diseñada especialmente para personas mayores o con movilidad reducida.
+            Sistema domótico no invasivo que vincula tu teléfono inteligente con un actuador mecánico de alto torque mediante Bluetooth Low Energy (BLE 5.0). Diseñado para máxima accesibilidad, personas mayores y protección mecánica absoluta.
           </p>
+
+          <!-- Telemetría Rápida (Hardware Metrics) -->
+          <div class="hero-telemetry-grid">
+            <div class="telemetry-card">
+              <div class="telemetry-header">
+                <span class="telemetry-card-title">WATCHDOG</span>
+                <span class="telemetry-chip ok">ACTIVO</span>
+              </div>
+              <div class="telemetry-number">30<span class="unit">s</span></div>
+              <div class="telemetry-caption">Auto-liberación fail-safe</div>
+            </div>
+
+            <div class="telemetry-card">
+              <div class="telemetry-header">
+                <span class="telemetry-card-title">LATENCIA BLE</span>
+                <span class="telemetry-chip cyan">&lt; 120ms</span>
+              </div>
+              <div class="telemetry-number">0<span class="unit">nube</span></div>
+              <div class="telemetry-caption">100% Procesamiento Local</div>
+            </div>
+
+            <div class="telemetry-card">
+              <div class="telemetry-header">
+                <span class="telemetry-card-title">ALIMENTACIÓN</span>
+                <span class="telemetry-chip warn">MONITOR ADC</span>
+              </div>
+              <div class="telemetry-number">6.0<span class="unit">V</span></div>
+              <div class="telemetry-caption">Riel servo independiente</div>
+            </div>
+          </div>
+
           <div class="hero-actions">
-            <a href="#descarga" class="btn btn-primary btn-lg">
-              <span class="btn-icon">📥</span> Descargar para Android
+            <a href="#descarga" class="btn btn-cyber-primary btn-lg">
+              <span class="btn-icon">⚡</span>
+              <span>Descargar ManejIA APK</span>
+              <span class="btn-badge">v1.0 Release</span>
             </a>
-            <a href="#caracteristicas" class="btn btn-outline btn-lg">
-              Ver Características
+            <a href="#especificaciones" class="btn btn-cyber-outline btn-lg">
+              <span class="btn-icon">📟</span>
+              <span>Ver Especificaciones</span>
             </a>
           </div>
+
           <div class="app-meta">
-            <span>Versión 1.0.0</span>
-            <span class="dot">•</span>
-            <span>Bluetooth LE 5.0</span>
-            <span class="dot">•</span>
-            <span>Reconocimiento Local</span>
+            <div class="meta-item"><span class="dot-ok">●</span> Bluetooth LE 5.0 GATT</div>
+            <div class="meta-separator">/</div>
+            <div class="meta-item"><span class="dot-ok">●</span> Offline Speech-to-Text</div>
+            <div class="meta-separator">/</div>
+            <div class="meta-item"><span class="dot-ok">●</span> Arquitectura No Invasiva</div>
           </div>
         </div>
 
+        <!-- Terminal Móvil / Phone Mockup Futurista -->
         <div class="hero-preview">
-          <div class="phone-mockup">
-            <div class="screen-content">
-              <div class="mock-status">
-                <span class="status-indicator"></span>
-                <span>Conectado a PuertaVoz-ESP32</span>
+          <div class="phone-mockup-frame">
+            <div class="phone-bezel">
+              <!-- Top Sensor Bar & Antena -->
+              <div class="phone-speaker-bar">
+                <div class="phone-camera"></div>
+                <div class="phone-speaker"></div>
               </div>
-              <div class="mock-mic-wrapper">
-                <div class="mock-mic-ripple"></div>
-                <div class="mock-mic-circle">
-                  <span class="mic-glyph">🎙️</span>
+
+              <div class="screen-content">
+                <!-- Status Bar del Móvil -->
+                <div class="phone-telemetry-bar">
+                  <div class="phone-time">14:15</div>
+                  <div class="phone-icons">
+                    <span class="phone-ble-icon">ᛒ</span>
+                    <span class="signal-bars">
+                      <span class="bar bar-1"></span>
+                      <span class="bar bar-2"></span>
+                      <span class="bar bar-3"></span>
+                      <span class="bar bar-4"></span>
+                    </span>
+                    <span class="battery-pill">98%</span>
+                  </div>
+                </div>
+
+                <!-- OLED Live Status Chip -->
+                <div class="mock-oled-card">
+                  <div class="oled-status-header">
+                    <span class="oled-led-pulse"></span>
+                    <span class="oled-title">PuertaVoz-ESP32</span>
+                    <span class="oled-rssi">-46 dBm</span>
+                  </div>
+                  <div class="oled-sub">ENLACE GATT CONECTADO · REPOSO SEGURO</div>
+                </div>
+
+                <!-- Actuator Telemetry Meter -->
+                <div class="mock-telemetry-banner">
+                  <div class="meter-stat">
+                    <span class="meter-label">SERVO PWM</span>
+                    <span class="meter-val text-cyan">1800 µs</span>
+                  </div>
+                  <div class="meter-divider"></div>
+                  <div class="meter-stat">
+                    <span class="meter-label">HOLD TIME</span>
+                    <span class="meter-val text-emerald">1500 ms</span>
+                  </div>
+                  <div class="meter-divider"></div>
+                  <div class="meter-stat">
+                    <span class="meter-label">V-RAIL</span>
+                    <span class="meter-val text-amber">6.02 V</span>
+                  </div>
+                </div>
+
+                <!-- Interactive Mic Centerpiece with Sonar Pulse -->
+                <div class="mock-mic-wrapper">
+                  <div class="sonar-ring ring-1"></div>
+                  <div class="sonar-ring ring-2"></div>
+                  <div class="sonar-ring ring-3"></div>
+                  <div class="mock-mic-core">
+                    <div class="mic-inner-glow"></div>
+                    <span class="mic-glyph">🎙️</span>
+                  </div>
+                </div>
+
+                <!-- Audio Visualizer Spectrum Wave -->
+                <div class="audio-spectrum">
+                  <span class="spec-bar s1"></span>
+                  <span class="spec-bar s2"></span>
+                  <span class="spec-bar s3"></span>
+                  <span class="spec-bar s4"></span>
+                  <span class="spec-bar s5"></span>
+                  <span class="spec-bar s6"></span>
+                  <span class="spec-bar s7"></span>
+                  <span class="spec-bar s8"></span>
+                  <span class="spec-bar s9"></span>
+                  <span class="spec-bar s10"></span>
+                  <span class="spec-bar s11"></span>
+                </div>
+
+                <div class="mock-voice-prompt-box">
+                  <span class="voice-cmd-icon">🗣️</span>
+                  <span class="voice-cmd-text">"Abre la puerta"</span>
+                  <span class="cursor-blink">_</span>
+                </div>
+
+                <!-- Cyber Action Switch Buttons -->
+                <div class="mock-buttons">
+                  <button class="mock-btn mock-btn-open" type="button">
+                    <span class="mock-btn-dot"></span>
+                    <span class="mock-btn-label">ABRIR PUERTA</span>
+                    <span class="mock-btn-code">CMD: 0x01</span>
+                  </button>
+                  <button class="mock-btn mock-btn-close" type="button">
+                    <span class="mock-btn-dot"></span>
+                    <span class="mock-btn-label">CERRAR / REPOSO</span>
+                    <span class="mock-btn-code">CMD: 0x02</span>
+                  </button>
+                  <button class="mock-btn mock-btn-estop" type="button">
+                    <span class="mock-btn-dot"></span>
+                    <span class="mock-btn-label">DESCONECTAR BLE</span>
+                    <span class="mock-btn-code">HALT</span>
+                  </button>
                 </div>
               </div>
-              <p class="mock-voice-prompt">"Abre la puerta"</p>
-              <div class="mock-buttons">
-                <div class="mock-btn mock-btn-open">Abrir Puerta</div>
-                <div class="mock-btn mock-btn-close">Cerrar / Reposo</div>
-                <div class="mock-btn mock-btn-estop">Parada Emergencia</div>
-              </div>
             </div>
+            <!-- Glow detrás del mockup -->
+            <div class="mockup-ambient-glow"></div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Características -->
-    <section id="caracteristicas" class="section bg-light">
+    <!-- Características (Módulos IoT del Sistema) -->
+    <section id="caracteristicas" class="section">
       <div class="container">
         <div class="section-title">
-          <h2>Diseñada para la accesibilidad y seguridad</h2>
-          <p>Priorizamos la autonomía del usuario con interacción por voz y protección mecánica total.</p>
+          <div class="section-badge">MÓDULOS DE ARQUITECTURA</div>
+          <h2>Diseño de Ingeniería para Accesibilidad y Seguridad Extrema</h2>
+          <p>Cada componente responde a protocolos de seguridad industrial: tolerancia a fallos, monitoreo de tensión en tiempo real y respuesta háptica inmediata.</p>
         </div>
 
         <div class="features-grid">
-          <div class="feature-card">
-            <div class="feature-icon">🗣️</div>
+          <!-- Card 1 -->
+          <div class="feature-card cyber-panel">
+            <div class="card-corner corner-tl"></div>
+            <div class="card-corner corner-tr"></div>
+            <div class="feature-header">
+              <div class="feature-icon-badge">🗣️</div>
+              <span class="feature-mod-code">MOD_01 // AUDIO_CORE</span>
+            </div>
             <h3>Comandos por Voz Offline</h3>
-            <p>Reconocimiento de voz directo en tu dispositivo con respuesta hablada (TTS). No requiere conexión constante a servidores externos.</p>
+            <p>Reconocimiento de intenciones ejecutado 100% de manera local en el teléfono móvil mediante sintetizador y motor offline, con feedback sonoro (TTS). Cero latencia de servidores externos.</p>
+            <div class="feature-footer-tags">
+              <span class="f-tag">Speech-to-Text Local</span>
+              <span class="f-tag">TTS Audio Feedback</span>
+            </div>
           </div>
 
-          <div class="feature-card">
-            <div class="feature-icon">🛡️</div>
-            <h3>Seguridad y Watchdog</h3>
-            <p>Retorno automático a reposo ante desconexiones. El actuador nunca presiona la manija indefinidamente evitando sobrecalentamiento del servo.</p>
+          <!-- Card 2 -->
+          <div class="feature-card cyber-panel">
+            <div class="card-corner corner-tl"></div>
+            <div class="card-corner corner-tr"></div>
+            <div class="feature-header">
+              <div class="feature-icon-badge">🛡️</div>
+              <span class="feature-mod-code">MOD_02 // FAILSAFE_WATCHDOG</span>
+            </div>
+            <h3>Seguridad y Watchdog por Hardware</h3>
+            <p>Temporizador de vigilancia de 30 segundos. Si ocurre una desconexión o corte de señal, el ESP32-S3 libera automáticamente el servomotor a su ángulo de reposo para evitar sobrecalentamiento del bobinado.</p>
+            <div class="feature-footer-tags">
+              <span class="f-tag">Watchdog Timer 30s</span>
+              <span class="f-tag">Auto-Retract Anti-Stall</span>
+            </div>
           </div>
 
-          <div class="feature-card">
-            <div class="feature-icon">⚙️</div>
-            <h3>Calibración Personalizable</h3>
-            <p>Ajusta el recorrido del servomotor (µs), límites mecánicos y tiempo de retención para adaptarse a cualquier tipo de manija de palanca.</p>
+          <!-- Card 3 -->
+          <div class="feature-card cyber-panel">
+            <div class="card-corner corner-tl"></div>
+            <div class="card-corner corner-tr"></div>
+            <div class="feature-header">
+              <div class="feature-icon-badge">⚙️</div>
+              <span class="feature-mod-code">MOD_03 // CALIBRATION_PWM</span>
+            </div>
+            <h3>Calibración y Modo Sweep</h3>
+            <p>Ajuste fino de pulsos PWM en microsegundos (µs) para reposo y presión. Incluye rutina de barrido para validar topes mecánicos en cualquier manija de palanca sin forzar engranajes metálicos.</p>
+            <div class="feature-footer-tags">
+              <span class="f-tag">Resolución 1 µs</span>
+              <span class="f-tag">Modo Sweep Automático</span>
+            </div>
           </div>
 
-          <div class="feature-card">
-            <div class="feature-icon">🔋</div>
-            <h3>Diagnóstico de Energía</h3>
-            <p>Monitoreo del voltaje del servo con avisos si la alimentación desciende de los 5.0 V necesarios para operar con fuerza.</p>
+          <!-- Card 4 -->
+          <div class="feature-card cyber-panel">
+            <div class="card-corner corner-tl"></div>
+            <div class="card-corner corner-tr"></div>
+            <div class="feature-header">
+              <div class="feature-icon-badge">🔋</div>
+              <span class="feature-mod-code">MOD_04 // POWER_TELEMETRY</span>
+            </div>
+            <h3>Telemetría y Diagnóstico de Riel</h3>
+            <p>Medición por canal ADC interno de la línea de 6V. Si la fuente externa entrega menos de 5.0V, el sistema genera alertas de advertencia para prevenir reinicios del microcontrolador durante picos de torque.</p>
+            <div class="feature-footer-tags">
+              <span class="f-tag">Monitor Vrail ADC</span>
+              <span class="f-tag">Alerta &lt; 5.0V</span>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Cómo Funciona -->
-    <section id="como-funciona" class="section">
+    <!-- Pipeline de Funcionamiento -->
+    <section id="como-funciona" class="section pipeline-section">
       <div class="container">
         <div class="section-title">
-          <h2>¿Cómo funciona el sistema?</h2>
-          <p>Un flujo intuitivo y robusto en tres simples pasos.</p>
+          <div class="section-badge">PIPELINE DE TRANSMISIÓN</div>
+          <h2>Flujo de Ejecución Zero-Latency</h2>
+          <p>Desde la captura del comando vocal hasta la apertura física de la manija de puerta.</p>
         </div>
 
-        <div class="steps-grid">
-          <div class="step-card">
-            <span class="step-num">1</span>
-            <h3>Presiona el Micrófono</h3>
-            <p>Toca el botón principal de la app y di <em>"abre la puerta"</em> o <em>"abrir"</em>.</p>
+        <div class="pipeline-grid">
+          <div class="pipeline-card cyber-panel">
+            <div class="pipeline-index">01</div>
+            <div class="pipeline-badge">ENTRADA ACÚSTICA</div>
+            <h3>Captura y Parser Vocal</h3>
+            <p>El usuario toca el botón táctil de gran tamaño o usa la activación por voz: <em>"Abre la puerta"</em>. El parser de expresiones procesa la intención gramatical en &lt; 80 ms sin consultar la nube.</p>
+            <div class="pipeline-metric">
+              <span class="metric-key">Intención:</span>
+              <span class="metric-val">IntentAction.open</span>
+            </div>
           </div>
-          <div class="step-card">
-            <span class="step-num">2</span>
-            <h3>Sin Confirmaciones</h3>
-            <p>Una orden, una acción. La app se conecta sola al abrir y ejecuta <em>"abre la puerta"</em> de inmediato: quien ya tiene la app en la mano no necesita un "sí" extra.</p>
+
+          <div class="pipeline-arrow-connector">
+            <div class="connector-line"></div>
+            <div class="connector-glow-dot"></div>
           </div>
-          <div class="step-card">
-            <span class="step-num">3</span>
-            <h3>Accionamiento Seguro</h3>
-            <p>El ESP32-S3 acciona el servo MG995, baja la manija durante el tiempo configurado y vuelve de inmediato a reposo.</p>
+
+          <div class="pipeline-card cyber-panel">
+            <div class="pipeline-index">02</div>
+            <div class="pipeline-badge">TRANSPORTE GATT</div>
+            <h3>Túnel BLE 5.0 Cifrado</h3>
+            <p>La aplicación emite un paquete GATT sobre el servicio dedicado al ESP32-S3. Ejecución directa e inmediata sin pasos de confirmación redundantes que retrasen a quien ya tiene la app.</p>
+            <div class="pipeline-metric">
+              <span class="metric-key">GATT Packet:</span>
+              <span class="metric-val">Opcode 0x01 (OPEN)</span>
+            </div>
+          </div>
+
+          <div class="pipeline-arrow-connector">
+            <div class="connector-line"></div>
+            <div class="connector-glow-dot"></div>
+          </div>
+
+          <div class="pipeline-card cyber-panel">
+            <div class="pipeline-index">03</div>
+            <div class="pipeline-badge">ACCIONAMIENTO PWM</div>
+            <h3>Torque Mecánico MG995</h3>
+            <p>El ESP32-S3 conmuta la señal PWM a <code>press_us</code> (1800 µs), baja la manija con 11 kg·cm de fuerza de retención durante <code>hold_ms</code> (1.5 s) y regresa con suavidad a reposo seguro.</p>
+            <div class="pipeline-metric">
+              <span class="metric-key">Ciclo:</span>
+              <span class="metric-val">Press → Hold → Safe Rest</span>
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Especificaciones de Hardware -->
-    <section id="especificaciones" class="section bg-light">
+    <!-- Especificaciones de Hardware (Datasheet Dashboard) -->
+    <section id="especificaciones" class="section">
       <div class="container">
         <div class="section-title">
-          <h2>Especificaciones de Hardware</h2>
-          <p>Componentes requeridos para armar e instalar el sistema.</p>
+          <div class="section-badge">INGENIERÍA Y HARDWARE</div>
+          <h2>Matriz de Especificaciones Técnicas</h2>
+          <p>Parámetros eléctricos, mecánicos y de conectividad utilizados en el prototipo funcional.</p>
         </div>
 
-        <div class="specs-table-wrapper">
-          <table class="specs-table">
-            <thead>
-              <tr>
-                <th>Componente</th>
-                <th>Especificación</th>
-                <th>Función</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Microcontrolador</strong></td>
-                <td>ESP32-S3 (N16R8 / N8R2)</td>
-                <td>Controlador principal con BLE 5.0 y gestión de seguridad.</td>
-              </tr>
-              <tr>
-                <td><strong>Servomotor</strong></td>
-                <td>MG995 (Engranajes metálicos)</td>
-                <td>Accionamiento mecánico de la manija de puerta.</td>
-              </tr>
-              <tr>
-                <td><strong>Alimentación Servo</strong></td>
-                <td>Fuente externa 6V / 3A (GND común)</td>
-                <td>Energía de torque para evitar reinicios en el ESP32.</td>
-              </tr>
-              <tr>
-                <td><strong>Mecanismo</strong></td>
-                <td>No Invasivo</td>
-                <td>Acople sin perforar puertas ni alterar cerraduras existentes.</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="specs-dashboard cyber-panel">
+          <div class="specs-table-wrapper">
+            <table class="specs-table">
+              <thead>
+                <tr>
+                  <th>MÓDULO / COMPONENTE</th>
+                  <th>ESPECIFICACIÓN TÉCNICA</th>
+                  <th>DESCRIPCIÓN OPERATIVA</th>
+                  <th>ESTADO</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div class="comp-col">
+                      <span class="comp-icon">🎛️</span>
+                      <div>
+                        <strong>ESP32-S3 Dual-Core</strong>
+                        <span class="comp-sub">Xtensa LX7 @ 240MHz · 16MB Flash</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td><code class="tech-code">BLE 5.0 GATT · FreeRTOS · GPIO PWM</code></td>
+                  <td>Control maestro de seguridad, temporización y servidor GATT BLE.</td>
+                  <td><span class="status-pill ok">ACTIVO</span></td>
+                </tr>
+
+                <tr>
+                  <td>
+                    <div class="comp-col">
+                      <span class="comp-icon">🦾</span>
+                      <div>
+                        <strong>Servomotor MG995</strong>
+                        <span class="comp-sub">Metal Gears · 180° Rotación</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td><code class="tech-code">11 kg·cm Torque @ 6V · PWM 50Hz</code></td>
+                  <td>Accionamiento mecánico directo sobre la manija de palanca.</td>
+                  <td><span class="status-pill ok">METÁLICO</span></td>
+                </tr>
+
+                <tr>
+                  <td>
+                    <div class="comp-col">
+                      <span class="comp-icon">⚡</span>
+                      <div>
+                        <strong>Fuente de Poder Riel</strong>
+                        <span class="comp-sub">Línea de Potencia Dedicada</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td><code class="tech-code">6.0V DC / 3.0A (GND Común Aislado)</code></td>
+                  <td>Evita caídas de tensión (brownout) y reinicios del ESP32 bajo torque.</td>
+                  <td><span class="status-pill ok">REGULADO</span></td>
+                </tr>
+
+                <tr>
+                  <td>
+                    <div class="comp-col">
+                      <span class="comp-icon">🚪</span>
+                      <div>
+                        <strong>Mecanismo Adaptador</strong>
+                        <span class="comp-sub">Acople de Fijación Rápida</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td><code class="tech-code">Cero Perforaciones · Impreso 3D PETG</code></td>
+                  <td>Montaje no invasivo en puertas residenciales estándar sin dañar cerraduras.</td>
+                  <td><span class="status-pill ok">NO INVASIVO</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Descarga -->
+    <!-- Descarga y Flashing Hub -->
     <section id="descarga" class="section download-section">
       <div class="container">
-        <div class="download-card">
-          <div class="download-content">
-            <h2>Descarga ManejIA en tu Teléfono</h2>
-            <p>Comienza a controlar tu puerta por voz hoy mismo. Compatible con dispositivos Android 8.0 o superior con Bluetooth BLE.</p>
-            <div class="download-buttons">
-              <a href="downloads/puertavoz-release.apk" class="btn btn-primary btn-lg" download>
-                <span class="btn-icon">📦</span> Descargar APK (Directo)
+        <div class="download-terminal-card cyber-panel">
+          <div class="terminal-header-bar">
+            <div class="terminal-dots">
+              <span class="t-dot t-red"></span>
+              <span class="t-dot t-yellow"></span>
+              <span class="t-dot t-green"></span>
+            </div>
+            <div class="terminal-title">DEPLOYMENT STATION // MANEJIA APP v1.0.0 RELEASE</div>
+            <div class="terminal-badge">APK ARM64 / ARMv7</div>
+          </div>
+
+          <div class="download-terminal-body">
+            <div class="download-main-text">
+              <h2>Instala ManejIA en tu Dispositivo Móvil</h2>
+              <p>
+                Descarga directamente el archivo ejecutable optimizado para Android. Compatible con Android 8.0 en adelante con conectividad Bluetooth Low Energy (BLE).
+              </p>
+            </div>
+
+            <div class="download-actions-cluster">
+              <a href="downloads/puertavoz-release.apk" class="btn btn-cyber-primary btn-xl" download>
+                <span class="btn-icon">📦</span>
+                <div class="btn-text-block">
+                  <span class="btn-subtext">PAQUETE OFICIAL DIRECTO</span>
+                  <span class="btn-maintext">Descargar APK para Android</span>
+                </div>
+                <span class="btn-glow-pulse"></span>
               </a>
-              <a href="https://github.com" target="_blank" rel="noreferrer" class="btn btn-outline-white btn-lg">
-                <span class="btn-icon">💻</span> Ver Código Fuente
+
+              <a href="https://github.com/Ale-fff/ProyectoDeArduino2026" target="_blank" rel="noreferrer" class="btn btn-cyber-outline btn-xl">
+                <span class="btn-icon">💻</span>
+                <div class="btn-text-block">
+                  <span class="btn-subtext">REPOSITORIO ABIERTO</span>
+                  <span class="btn-maintext">Ver Código en GitHub</span>
+                </div>
               </a>
             </div>
-            <p class="download-notes">
-              * Nota: Si instalas el archivo .apk por primera vez, habilita la opción de "Instalar aplicaciones de fuentes desconocidas" en los ajustes de tu dispositivo Android.
-            </p>
+
+            <!-- Terminal Info Callout -->
+            <div class="terminal-note-box">
+              <div class="note-icon">💡</div>
+              <div class="note-content">
+                <strong>Instalación por primera vez:</strong> En Ajustes de tu dispositivo Android, habilita la opción de <em>"Instalar aplicaciones de fuentes desconocidas"</em> o confirma el permiso en tu navegador para completar la instalación del APK.
+              </div>
+            </div>
+
+            <div class="deployment-badges-row">
+              <span class="dep-badge">✓ SHA-256 Validado</span>
+              <span class="dep-badge">✓ GATT BLE Verified</span>
+              <span class="dep-badge">✓ PlatformIO ESP32-S3</span>
+              <span class="dep-badge">✓ Flutter v3.22 Ready</span>
+            </div>
           </div>
         </div>
       </div>
     </section>
   </main>
 
-  <!-- Footer -->
+  <!-- Footer con Estética Técnica -->
   <footer class="footer">
     <div class="container footer-content">
-      <p>© 2026 ManejIA / Proyecto Arduino. Código Abierto.</p>
-      <div class="footer-links">
+      <div class="footer-brand">
+        <div class="logo">
+          <span class="logo-icon">🎙️</span>
+          <span class="logo-text">ManejIA</span>
+        </div>
+        <p class="footer-copy">© 2026 ManejIA / Proyecto Arduino & Flutter. Arquitectura de Código Abierto.</p>
+      </div>
+
+      <div class="footer-nav">
         <a href="#caracteristicas">Características</a>
+        <a href="#como-funciona">Pipeline</a>
         <a href="#especificaciones">Hardware</a>
         <a href="#descarga">Descargas</a>
+        <a href="https://github.com/Ale-fff/ProyectoDeArduino2026" target="_blank" rel="noreferrer">GitHub</a>
       </div>
     </div>
   </footer>

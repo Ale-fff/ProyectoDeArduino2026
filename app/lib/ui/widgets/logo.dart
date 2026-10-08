@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../app_theme.dart';
 
-/// Logo de ManejIA, dibujado en codigo.
+/// Logo de ManejIA - Estilo Nodo Domótico IoT / Actuador BLE.
 ///
-/// No hay archivo de imagen en el repositorio, y un PNG obligaria a mantener
-/// varias resoluciones para el splash, el launcher y la pantalla. Con un
-/// [CustomPainter] el mismo logo sirve para los tres y ademas se recolorea
-/// con el tema.
+/// Dibujado en código vectorial mediante [CustomPainter] para nitidez perfecta
+/// en cualquier resolución y adaptación automática al esquema de color activo.
 ///
-/// Lo que representa: una puerta con la manija retraida y las ondas de radio
-/// saliendo por el lado de la bisagra. Es literalmente lo que hace el servo.
+/// Representa el mecanismo de la cerradura inteligente:
+/// el módulo del actuador, la manija de puerta y las ondas de radiofrecuencia BLE 5.0.
 class ManejIALogo extends StatelessWidget {
   const ManejIALogo({
     super.key,
@@ -22,13 +20,13 @@ class ManejIALogo extends StatelessWidget {
 
   final double size;
 
-  /// Color de la puerta. Por defecto, el primario del tema.
+  /// Color primario del actuador. Por defecto, el primario del tema.
   final Color? tone;
 
-  /// Color de las ondas. Por defecto, el color de la puerta.
+  /// Color de contraste de los componentes. Por defecto, blanco o primario según el fondo.
   final Color? onTone;
 
-  /// Sin fondo, para ponerlo sobre una barra.
+  /// Si incluye el chasis de fondo o solo el glifo.
   final bool showBackground;
 
   @override
@@ -64,53 +62,85 @@ class _LogoPainter extends CustomPainter {
     final s = size.shortestSide;
 
     if (showBackground) {
+      // Chasis externo del módulo IoT con bisel redondeado
       final bg = RRect.fromRectAndRadius(
         Rect.fromLTWH(0, 0, s, s),
-        Radius.circular(s * 0.24),
+        Radius.circular(s * 0.26),
       );
-      canvas.drawRRect(
-        bg,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Color.lerp(tone, Colors.white, 0.18)!,
-              tone,
-            ],
-          ).createShader(Offset.zero & size),
-      );
+
+      // Degradado sutil con iluminación superior
+      final bgPaint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Color.lerp(tone, Colors.white, 0.28)!,
+            tone,
+            Color.lerp(tone, Colors.black, 0.22)!,
+          ],
+        ).createShader(Offset.zero & size);
+      canvas.drawRRect(bg, bgPaint);
+
+      // Borde exterior reflectante
+      final borderPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = s * 0.02
+        ..color = Colors.white.withValues(alpha: 0.35);
+      canvas.drawRRect(bg, borderPaint);
     }
 
-    // --- puerta ---
-    final door = Rect.fromLTWH(s * 0.28, s * 0.20, s * 0.30, s * 0.60);
+    // --- Puerta y bastidor del actuador ---
+    final doorRect = Rect.fromLTWH(s * 0.24, s * 0.18, s * 0.32, s * 0.64);
     final doorPaint = Paint()..color = onTone;
     canvas.drawRRect(
-      RRect.fromRectAndRadius(door, Radius.circular(s * 0.05)),
+      RRect.fromRectAndRadius(doorRect, Radius.circular(s * 0.06)),
       doorPaint,
     );
 
-    // --- manija retráida: un hueco en el canto derecho de la puerta ---
-    final knob = Offset(s * 0.485, s * 0.52);
-    canvas.drawCircle(knob, s * 0.038, Paint()..color = tone);
-
-    // --- ondas de radio ---
-    final wave = Paint()
+    // Ranura interna decorativa (detalle de panel arquitectónico)
+    final slotPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = s * 0.055
-      ..strokeCap = StrokeCap.round
-      ..color = onTone;
+      ..strokeWidth = s * 0.018
+      ..color = tone.withValues(alpha: 0.4);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(s * 0.27, s * 0.23, s * 0.26, s * 0.54),
+        Radius.circular(s * 0.04),
+      ),
+      slotPaint,
+    );
 
-    // Dos ondas concéntricas alrededor de la manija, openness hacia la
-    // derecha, que es por donde "sale" la orden.
-    for (final (radius, alpha) in <(double, double)>[(0.11, 0.85), (0.19, 0.45)]) {
-      wave.color = onTone.withValues(alpha: alpha);
+    // --- Eje del Servomotor y Cerrojo (Punto de rotación) ---
+    final servoHub = Offset(s * 0.485, s * 0.52);
+
+    // Anillo exterior del eje
+    final hubRingPaint = Paint()..color = tone;
+    canvas.drawCircle(servoHub, s * 0.052, hubRingPaint);
+
+    // Núcleo brillante / LED de estado del actuador
+    final hubLedPaint = Paint()..color = onTone;
+    canvas.drawCircle(servoHub, s * 0.024, hubLedPaint);
+
+    // --- Ondas de Telemetría BLE (Radiofrecuencia) ---
+    final wavePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final waves = <(double, double, double)>[
+      (0.12, 0.95, 0.055), // (radio, opacidad, grosor)
+      (0.20, 0.65, 0.048),
+      (0.28, 0.35, 0.040),
+    ];
+
+    for (final (radius, alpha, stroke) in waves) {
+      wavePaint.color = onTone.withValues(alpha: alpha);
+      wavePaint.strokeWidth = s * stroke;
       canvas.drawArc(
-        Rect.fromCircle(center: knob, radius: s * radius),
+        Rect.fromCircle(center: servoHub, radius: s * radius),
         -0.85,
         1.70,
         false,
-        wave,
+        wavePaint,
       );
     }
   }
@@ -120,9 +150,7 @@ class _LogoPainter extends CustomPainter {
       old.tone != tone || old.onTone != onTone || old.showBackground != showBackground;
 }
 
-/// El mismo logo, pero como palabra: onda + nombre.
-///
-/// Se usa en el splash, donde el logo solo queda pequeno.
+/// Logo con tipografía integrada para la pantalla de bienvenida y barra superior.
 class ManejIAWordmark extends StatelessWidget {
   const ManejIAWordmark({
     super.key,
@@ -141,15 +169,30 @@ class ManejIAWordmark extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
         ManejIALogo(size: logoSize, tone: AppTheme.seedLight, onTone: Colors.white),
-        const SizedBox(width: 14),
-        Text(
-          'ManejIA',
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.5,
-            color: scheme.onSurface,
-          ),
+        const SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'ManejIA',
+              style: TextStyle(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.6,
+                color: scheme.onSurface,
+              ),
+            ),
+            Text(
+              'IoT BLE DOMOTICS',
+              style: TextStyle(
+                fontSize: fontSize * 0.32,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.5,
+                color: AppTheme.techCyan,
+              ),
+            ),
+          ],
         ),
       ],
     );

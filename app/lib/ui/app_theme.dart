@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
 
-/// Tema de la app.
+/// Tema de la app ManejIA - Edición Dashboard Domótico / Hardware IoT.
 ///
-/// Pensado para una persona mayor: tipografia grande, contrastes altos y
-/// botones de 56 px como minimo, que es el objetivo tactil recomendado.
+/// Combina alta accesibilidad para adultos mayores (tipografía grande >= 16px,
+/// botones de 56 px táctiles) con una estética de panel de control domótico
+/// de grado de ingeniería:
 ///
-/// Dos identidades bien distintas, porque la app se usa de dia en la puerta y
-/// de noche en el pasillo:
-///
-///   * [light] -> calido. Fondo crema, primario rojo/naranja. Es el modo por
-///     defecto: el color calido invita a tocar y el servo se ve "vivo".
-///   * [dark]  -> negro azulado con acento azul. No cansa la vista de noche y
-///     el acento se aparta del rojo de "parado" para no confundirse con una
-///     alarma.
-///
-/// Se arranca en [light] porque un modo oscuro surprises en un boton que abre
-/// una puerta real. El usuario puede cambiarlo con el boton de la barra.
+///   * [light] -> Panel de instrumentación técnico claro, alto contraste y legible.
+///   * [dark]  -> Consola oscura IoT de alta fidelidad, con acentos neón y lectura tipo HUD.
 class AppTheme {
   const AppTheme._();
 
@@ -25,13 +17,18 @@ class AppTheme {
   /// Naranja de acento en modo oscuro.
   static const Color seedDark = Color(0xFFF97316);
 
+  /// Acento cian tecnológico del modo oscuro (BLE / Telemetría).
+  static const Color techCyan = Color(0xFF06B6D4);
+
   /// Azul de apoyo del modo oscuro.
   static const Color accentDark = Color(0xFF3B82F6);
 
-  // Se mantienen como constantes porque hay varios `const` en la UI. El valor
-  // es un punto medio que se lee en los dos modos.
-  static const Color warn = Color(0xFFE5484D);
-  static const Color ok = Color(0xFF2F9E63);
+  /// Acento ámbar para advertencias de hardware / calibración.
+  static const Color amberAccent = Color(0xFFF59E0B);
+
+  /// Indicadores de estado LED (compatibles con `const` en la UI).
+  static const Color warn = Color(0xFFEF4444);
+  static const Color ok = Color(0xFF10B981);
 
   static ThemeData light() => _base(_lightScheme(), Brightness.light);
 
@@ -40,23 +37,24 @@ class AppTheme {
   static ColorScheme _lightScheme() {
     final scheme = ColorScheme.fromSeed(seedColor: seedLight);
     return scheme.copyWith(
-      // Crema en vez de blanco puro: cansa menos la vista durante el dia.
-      surface: const Color(0xFFFFF8F2),
+      // Superficie limpia estilo instrumentación de laboratorio
+      surface: const Color(0xFFF8FAFC),
       surfaceContainerLowest: const Color(0xFFFFFFFF),
-      surfaceContainerLow: const Color(0xFFFFF1E6),
-      surfaceContainer: const Color(0xFFFDEADC),
-      surfaceContainerHigh: const Color(0xFFF8E3D3),
+      surfaceContainerLow: const Color(0xFFF1F5F9),
+      surfaceContainer: const Color(0xFFE2E8F0),
+      surfaceContainerHigh: const Color(0xFFCBD5E1),
+      surfaceContainerHighest: const Color(0xFF94A3B8),
       primary: const Color(0xFFC2410C),
       onPrimary: Colors.white,
-      primaryContainer: const Color(0xFFFFE2CC),
-      onPrimaryContainer: const Color(0xFF5A1B00),
-      secondary: const Color(0xFFB45309),
-      secondaryContainer: const Color(0xFFFFEBC7),
-      onSecondaryContainer: const Color(0xFF4A2A00),
-      tertiary: const Color(0xFF9A3412),
-      error: const Color(0xFFB3261E),
-      outline: const Color(0xFF9C7A66),
-      outlineVariant: const Color(0xFFEBD5C6),
+      primaryContainer: const Color(0xFFFFEDD5),
+      onPrimaryContainer: const Color(0xFF7C2D12),
+      secondary: const Color(0xFF0284C7),
+      secondaryContainer: const Color(0xFFE0F2FE),
+      onSecondaryContainer: const Color(0xFF0369A1),
+      tertiary: const Color(0xFF0F766E),
+      error: const Color(0xFFDC2626),
+      outline: const Color(0xFF94A3B8),
+      outlineVariant: const Color(0xFFE2E8F0),
     );
   }
 
@@ -66,25 +64,25 @@ class AppTheme {
       brightness: Brightness.dark,
     );
     return scheme.copyWith(
-      // Negro azulado, no gris neutro.
-      surface: const Color(0xFF0A0F1A),
-      surfaceContainerLowest: const Color(0xFF05080F),
-      surfaceContainerLow: const Color(0xFF0E1420),
-      surfaceContainer: const Color(0xFF141B29),
-      surfaceContainerHigh: const Color(0xFF1B2434),
-      surfaceContainerHighest: const Color(0xFF222D40),
+      // Consola de operaciones IoT en negro grafito / obsidiana
+      surface: const Color(0xFF060911),
+      surfaceContainerLowest: const Color(0xFF030509),
+      surfaceContainerLow: const Color(0xFF0D1424),
+      surfaceContainer: const Color(0xFF131D33),
+      surfaceContainerHigh: const Color(0xFF1B2844),
+      surfaceContainerHighest: const Color(0xFF243456),
       primary: seedDark,
-      onPrimary: const Color(0xFF3B1500),
-      primaryContainer: const Color(0xFF6B2C0C),
+      onPrimary: const Color(0xFF2E0D00),
+      primaryContainer: const Color(0xFF7C2D12),
       onPrimaryContainer: const Color(0xFFFFDCC4),
-      secondary: accentDark,
-      onSecondary: const Color(0xFF00214A),
-      secondaryContainer: const Color(0xFF1E3A6B),
-      onSecondaryContainer: const Color(0xFFD3E2FF),
-      tertiary: const Color(0xFF60A5FA),
-      error: const Color(0xFFFFB4AB),
-      outline: const Color(0xFF44506B),
-      outlineVariant: const Color(0xFF2A3446),
+      secondary: techCyan,
+      onSecondary: const Color(0xFF002029),
+      secondaryContainer: const Color(0xFF0E3846),
+      onSecondaryContainer: const Color(0xFFA5F3FC),
+      tertiary: const Color(0xFF38BDF8),
+      error: const Color(0xFFF87171),
+      outline: const Color(0xFF334768),
+      outlineVariant: const Color(0xFF1C273C),
     );
   }
 
@@ -94,34 +92,44 @@ class AppTheme {
       brightness: brightness,
       colorScheme: scheme,
       visualDensity: VisualDensity.standard,
-      // Minimo 16 px de cuerpo: por debajo la app deja de ser legible.
+      // Gran tamaño de fuente para máxima legibilidad y ergonomía
       textTheme: const TextTheme(
-        displaySmall: TextStyle(fontSize: 36, fontWeight: FontWeight.w600),
-        headlineMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.w600),
-        titleLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-        titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+        displaySmall: TextStyle(fontSize: 36, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+        headlineMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.3),
+        titleLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.2),
+        titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         bodyLarge: TextStyle(fontSize: 18),
         bodyMedium: TextStyle(fontSize: 16),
-        labelLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        labelLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.2),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,
         foregroundColor: scheme.onSurface,
-        // La barra ya lleva el color del fondo: sin tinte, los bordes de las
-        // tarjetas se ven sueltos.
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        titleTextStyle: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.3,
+          color: scheme.onSurface,
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(56),
-          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(56),
-          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           side: BorderSide(color: scheme.outline, width: 1.5),
         ),
       ),
@@ -129,8 +137,8 @@ class AppTheme {
         elevation: 0,
         color: scheme.surfaceContainerLow,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: scheme.outlineVariant),
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: scheme.outlineVariant, width: 1.2),
         ),
       ),
       iconTheme: IconThemeData(color: scheme.onSurfaceVariant),

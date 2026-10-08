@@ -13,11 +13,10 @@ import 'calibration_screen.dart';
 import 'widgets/animated_background.dart';
 import 'widgets/mic_button.dart';
 
-/// Pantalla unica de la app.
+/// Pantalla única de control - Consola Domótica ManejIA.
 ///
-/// Se eligio una sola pantalla a proposito: menos menus, menos viajes, menos
-/// formas de llegar a un estado raro. Conectar, hablar y ver el resultado se
-/// hacen sin navegar.
+/// Integra la gestión del enlace BLE, captura de voz local y accionamiento
+/// mecánico del servomotor con una estética de panel de control IoT.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
@@ -32,7 +31,7 @@ class HomeScreen extends StatefulWidget {
   /// `MaterialApp`.
   final bool isDarkMode;
 
-  /// Si es `null` no se muestra el conmutador (util en pruebas).
+  /// Si es `null` no se muestra el conmutador (útil en pruebas).
   final VoidCallback? onToggleTheme;
 
   @override
@@ -52,14 +51,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int? _pressUs;
   int? _restUs;
 
-  /// `null` = el ESP32 todavia no ha mandado su `config`. No es lo mismo que
-  /// "dice que no esta calibrado": sin datos, [IntentAction.open] no se
-  /// bloquea. Bloquear por desconocimiento hacia que el primer comando de voz
-  /// fallara siempre con "no esta calibrado" en un dispositivo recien
-  /// emparejado.
+  /// `null` = el ESP32 todavía no ha mandado su `config`.
   bool? _calibrated;
   bool _vrailOk = true;
-  String _lastMessage = 'Toca el microfono y di "abre la puerta".';
+  String _lastMessage = 'Toca el micrófono y di "abre la puerta".';
   bool _micBusy = false;
 
   @override
@@ -75,21 +70,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _voice.addListener(_onVoiceChanged);
     unawaited(_speech.initialize());
     unawaited(_tts.initialize());
-    // Conectar sola al abrir: quien usa la puerta no deberia tener que
-    // apretar "conectar" cada vez.
     unawaited(_autoConnect());
   }
 
-  /// Busca el ESP32 al arrancar y se conecta si hay exactamente uno.
-  ///
-  /// Con varios compatibles NO elige ninguno: adivinar cual es el suyo seria
-  /// una forma sutil de abrir la puerta de otra casa. En ese caso la persona
-  /// usa el boton de conectar, que si lista.
   Future<void> _autoConnect() async {
     final missing = await _perms.missingForScan();
     if (missing.isNotEmpty || !mounted) return;
 
-    // Si la app vuelve a primer plano con el enlace ya vivo, no se toca nada.
     if (widget.link.isReady) return;
 
     await widget.link.scan();
@@ -101,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     await widget.link.connect(targets.first.device);
     if (!mounted) return;
-    setState(() => _lastMessage = 'Actuador conectado.');
+    setState(() => _lastMessage = 'Actuador conectado vía BLE.');
   }
 
   @override
@@ -120,8 +107,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // El motor de voz se queda colgado si la app pasa a segundo plano
-    // mientras escucha. Cortarlo aqui evita el caso raro de "no hace nada".
     if (state != AppLifecycleState.resumed) {
       _speech.cancel();
     }
@@ -138,18 +123,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } else {
       _pingTimer?.cancel();
       _pingTimer = null;
-      // Perdimos el enlace a mitad de una secuencia: hay que devolver el
-      // control, no dejar el boton en "ejecutando" para siempre.
       _voice.onSequenceFinished();
     }
   }
 
-  /// El watchdog del firmware corta un movimiento si pasan 30 s sin ping, asi
-  /// que se manda uno cada 5 s mientras haya conexion.
-  ///
-  /// Antes solo pulsaba durante una secuencia en ejecucion. Con el servo
-  /// quieto presionado hasta un `close` eso dejaba de renovar el reloj del
-  /// watchdog en el momento exacto en que mas importaba.
   void _startPing() {
     _pingTimer?.cancel();
     _pingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
@@ -163,9 +140,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _voice.onSpeechResult(hypotheses);
   }
 
-  /// El motor de voz cambia de estado por su cuenta (empieza a escuchar, se
-  /// agota el tiempo, hay error). Sin esto, la barra de "Escuchando" se queda
-  /// pegada encendida porque [VoicePhase] no refleja lo que hace el microfono.
   void _onSpeechStateChanged() {
     if (!mounted) return;
     setState(() {});
@@ -185,8 +159,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         unawaited(_tts.speak(d.message));
       case VoiceOutcome.askToRepeat:
         _lastMessage = d.message;
-        // Clip grabado en vez de TTS: el usuario lo pidio asi y suena siempre
-        // igual, con o sin voces espanolas instaladas.
         unawaited(_tts.speakNotUnderstood());
       case VoiceOutcome.error:
         _lastMessage = d.message;
@@ -199,8 +171,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _voice.onTransportError(VoiceStrings.notConnected);
       return;
     }
-    // Solo se frena si el ESP32 ha dicho explicitamente que no esta calibrado.
-    // Con `_calibrated == null` todavia no hay config y se deja pasar.
     if (_calibrated == false && command.cmd == AppCommand.open) {
       _voice.onTransportError(VoiceStrings.notCalibrated);
       return;
@@ -239,9 +209,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       case AppEventKind.error:
         _voice.onSequenceFinished();
-        // Los errores "benignos" son de rutina: la app se adiapa al paso
-        // lento de la persona o a una repeticion. Gritar "error" por cada uno
-        // haria que dejara de escuchar.
         if (!isBenign(e.errorCode ?? DoorErrorCode.malformed)) {
           _lastMessage = e.message ?? '';
           unawaited(_tts.speak(_messageFor(e.errorCode ?? DoorErrorCode.malformed)));
@@ -267,12 +234,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (_micBusy) return;
     _micBusy = true;
     try {
-      // Tocar el microfono calla a la app: si no, se escucha a si misma.
       await _tts.stop();
 
-      // El microfono se pide aqui y no en el arranque: pedirlo de entrada y que
-      // lo denieguen deja la app inservible, mientras que asi los botones
-      // manuales siguen sirviendo.
       if (!await _perms.requestMicrophone()) {
         if (mounted) {
           setState(() => _lastMessage = PermissionService.instructionsFor('microphone'));
@@ -292,8 +255,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _connect() async {
-    // Sin este paso, en Android 12+ el escaneo falla en silencio y la pantalla
-    // muestra "no se encontro el actuador" sin decir por que.
     final missing = await _perms.missingForScan();
     if (missing.isNotEmpty) {
       if (!mounted) return;
@@ -307,30 +268,57 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _showDeviceList();
   }
 
-  /// Lista siempre visible de los dispositivos cercanos, con los compatibles
-  /// primero. Antes se auto-conectaba cuando solo habia uno, y la persona
-  /// nunca llegaba a ver a que se estaba conectando.
   Future<void> _showDeviceList() async {
     await showModalBottomSheet<void>(
       context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) => SafeArea(
         child: StatefulBuilder(
           builder: (context, setSheetState) {
             final devices = widget.link.foundDevices;
+            final scheme = Theme.of(context).colorScheme;
+
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: Row(
                     children: <Widget>[
-                      const Expanded(
-                        child: Text('Dispositivos cercanos',
-                            style: TextStyle(
-                                fontSize: 20, fontWeight: FontWeight.w600)),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.radar, color: scheme.primary, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Escáner de Dispositivos BLE',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            Text(
+                              'Dispositivos compatibles con ManejIA',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       IconButton(
-                        tooltip: 'Buscar de nuevo',
+                        tooltip: 'Escanear de nuevo',
                         icon: const Icon(Icons.refresh),
                         onPressed: () async {
                           setSheetState(() {});
@@ -341,34 +329,62 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
+                const Divider(height: 1),
                 if (devices.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                        'Buscando... Si no aparece nada, revisa que el '
-                        'actuador este encendido y cerca.'),
+                  Padding(
+                    padding: const EdgeInsets.all(28),
+                    child: Column(
+                      children: [
+                        const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Buscando actuadores en rango BLE...',
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
                   )
                 else
                   Flexible(
                     child: ListView(
                       shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       children: <Widget>[
                         for (final d in devices)
                           ListTile(
-                            leading: Icon(
-                              d.compatible ? Icons.doorbell : Icons.bluetooth_disabled,
-                              color: d.compatible ? Theme.of(context).colorScheme.primary : null,
+                            leading: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: d.compatible
+                                    ? AppTheme.ok.withValues(alpha: 0.15)
+                                    : scheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                d.compatible ? Icons.bluetooth_connected : Icons.bluetooth,
+                                color: d.compatible ? AppTheme.ok : scheme.onSurfaceVariant,
+                              ),
                             ),
                             title: Text(
                               d.device.platformName.isNotEmpty
                                   ? d.device.platformName
                                   : d.device.remoteId.str,
+                              style: const TextStyle(fontWeight: FontWeight.w700),
                             ),
                             subtitle: Text(
-                              '${d.compatible ? "compatible" : "otro dispositivo"} · '
-                              '${d.rssi} dBm',
+                              '${d.compatible ? "COMPATIBLE ESP32" : "OTRO DISPOSITIVO"} · ${d.rssi} dBm',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: d.compatible ? AppTheme.ok : scheme.onSurfaceVariant,
+                                fontWeight: d.compatible ? FontWeight.w600 : FontWeight.normal,
+                              ),
                             ),
-                            trailing: const Icon(Icons.chevron_right),
+                            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                             onTap: () {
                               Navigator.pop(context);
                               unawaited(widget.link.connect(d.device));
@@ -394,11 +410,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ManejIA'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('ManejIA'),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: scheme.primary.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                'BLE IoT',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  color: scheme.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
         actions: <Widget>[
           if (link.isReady)
             IconButton(
-              tooltip: 'Calibración',
+              tooltip: 'Calibración de Servomotor',
               icon: const Icon(Icons.tune),
               onPressed: () {
                 Navigator.of(context).push(
@@ -409,9 +448,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               },
             ),
           IconButton(
-            tooltip: 'Conectar',
+            tooltip: link.isReady ? 'Conectado a BLE' : 'Conectar actuador',
             onPressed: _connect,
-            icon: Icon(link.isReady ? Icons.bluetooth_connected : Icons.bluetooth),
+            icon: Icon(
+              link.isReady ? Icons.bluetooth_connected : Icons.bluetooth,
+              color: link.isReady ? AppTheme.ok : null,
+            ),
           ),
           if (widget.onToggleTheme != null)
             IconButton(
@@ -425,15 +467,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: SafeArea(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
+              constraints: const BoxConstraints(maxWidth: 540),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: <Widget>[
                     _statusCard(context),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 28),
                     Center(
                       child: MicButton(
                         phase: _voice.phase,
@@ -446,43 +488,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       _confirmBanner(context),
                       const SizedBox(height: 16),
                     ],
-                    // El mensaje se sustituye con un fundido en vez de saltar:
-                    // es la lectura principal durante toda la sesion.
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 260),
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        child: SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0, 0.25),
-                            end: Offset.zero,
-                          ).animate(animation),
-                          child: child,
-                        ),
-                      ),
-                      child: Text(
-                        _lastMessage,
-                        key: ValueKey<String>(_lastMessage),
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: _voice.phase == VoicePhase.pendingConfirm
-                                  ? AppTheme.warn
-                                  : scheme.onSurface,
-                            ),
-                      ),
-                    ),
-                    if (_voice.transcript.isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 8),
-                      Text(
-                        '"${_voice.transcript}"',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
-                    ],
-                    const SizedBox(height: 32),
+                    // Consola de lectura de comandos de voz
+                    _voiceConsoleCard(context),
+                    const SizedBox(height: 28),
                     _manualControls(context),
                   ],
                 ),
@@ -495,42 +503,131 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// Barra de pie que aparece SOLO mientras el microfono esta grabando.
-  ///
-  /// Va fija abajo, no dentro del scroll, porque el usuario la pidio "abajo" y
-  /// porque tiene que verse aunque la pantalla este en scrolls largos. La
-  /// consulta la verdad al microfono ([SpeechService.isListening]) y no a
-  /// [VoicePhase]: la fase puede quedarse en `listening` si el turno termina
-  /// sin coincidir, y una barra encendida ahi miente.
-  Widget _listeningBar(BuildContext context) {
+  /// Consola / Terminal de texto para el comando vocal recibido.
+  Widget _voiceConsoleCard(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _voice.phase == VoicePhase.pendingConfirm
+              ? AppTheme.warn.withValues(alpha: 0.5)
+              : scheme.outlineVariant,
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.record_voice_over,
+                size: 16,
+                color: scheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'COMANDO VOCAL',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.2),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              ),
+            ),
+            child: Text(
+              _lastMessage,
+              key: ValueKey<String>(_lastMessage),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: _voice.phase == VoicePhase.pendingConfirm
+                        ? AppTheme.warn
+                        : scheme.onSurface,
+                  ),
+            ),
+          ),
+          if (_voice.transcript.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '"${_voice.transcript}"',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Barra de pie fija durante escucha activa.
+  Widget _listeningBar(BuildContext context) {
     return AnimatedSize(
       duration: const Duration(milliseconds: 180),
       alignment: Alignment.topCenter,
       child: _speech.isListening
           ? Container(
               width: double.infinity,
-              color: scheme.primary,
+              decoration: BoxDecoration(
+                color: AppTheme.ok,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.ok.withValues(alpha: 0.4),
+                    blurRadius: 16,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
-              child: Row(
+              child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
                   SizedBox(
-                    width: 18,
-                    height: 18,
+                    width: 20,
+                    height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      color: scheme.onPrimary,
+                      color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 14),
                   Text(
-                    'Escuchando...',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: scheme.onPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    'ESCUCHANDO COMANDO DE VOZ...',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ],
               ),
@@ -539,18 +636,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// HUD / Tarjeta de Telemetría de Hardware.
   Widget _statusCard(BuildContext context) {
     final link = widget.link;
     final scheme = Theme.of(context).colorScheme;
 
-    final (IconData icon, String title, Color color) = switch (link.status) {
-      BleLinkStatus.ready => (Icons.check_circle_outline, 'Conectado', AppTheme.ok),
-      BleLinkStatus.connecting => (Icons.bluetooth_searching, 'Conectando', scheme.primary),
-      BleLinkStatus.scanning => (Icons.search, 'Buscando', scheme.primary),
-      BleLinkStatus.bluetoothOff => (Icons.bluetooth_disabled, 'Bluetooth apagado', AppTheme.warn),
-      BleLinkStatus.error => (Icons.error_outline, 'Error', AppTheme.warn),
-      BleLinkStatus.disconnected => (Icons.link_off, 'Sin conectar', scheme.onSurfaceVariant),
-      BleLinkStatus.unknown => (Icons.hourglass_empty, 'Iniciando', scheme.onSurfaceVariant),
+    final (IconData icon, String title, Color color, String stateTag) = switch (link.status) {
+      BleLinkStatus.ready => (Icons.sensors, 'ESP32-S3 Conectado', AppTheme.ok, 'ENLACE ACTIVO'),
+      BleLinkStatus.connecting => (Icons.bluetooth_searching, 'Conectando...', scheme.primary, 'SINCRONIZANDO'),
+      BleLinkStatus.scanning => (Icons.radar, 'Buscando Actuador...', scheme.primary, 'ESCANEANDO'),
+      BleLinkStatus.bluetoothOff => (Icons.bluetooth_disabled, 'Bluetooth Apagado', AppTheme.warn, 'DESACTIVADO'),
+      BleLinkStatus.error => (Icons.error_outline, 'Falla de Conexión', AppTheme.warn, 'ERROR'),
+      BleLinkStatus.disconnected => (Icons.link_off, 'Sin Conexión BLE', scheme.onSurfaceVariant, 'DESCONECTADO'),
+      BleLinkStatus.unknown => (Icons.hourglass_empty, 'Iniciando Subsistema...', scheme.onSurfaceVariant, 'INICIANDO'),
     };
 
     final bool detail = _pressUs != null && _restUs != null;
@@ -558,68 +656,120 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            // El titulo se funde en vez de saltar. Con el BLE pasando de
-            // "Buscando" a "Conectado" a "Sin conectar" cada pocos segundos,
-            // el salto seco hacia parpadear.
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              transitionBuilder: (child, animation) => FadeTransition(
-                opacity: animation,
-                child: child,
-              ),
-              child: Row(
-                key: ValueKey<String>('$title/$color'),
-                children: <Widget>[
-                  Icon(icon, color: color),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(title, style: Theme.of(context).textTheme.titleLarge),
+            // Cabecera con LED de telemetría y título
+            Row(
+              children: <Widget>[
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color,
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.6),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      Text(
+                        stateTag,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.6,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(icon, color: color, size: 28),
+              ],
             ),
+
             if (link.status == BleLinkStatus.error && link.lastError.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.only(top: 10),
                 child: Text(link.lastError,
-                    style: TextStyle(color: scheme.error, fontSize: 15)),
+                    style: TextStyle(color: scheme.error, fontSize: 14)),
               ),
+
             if (link.status == BleLinkStatus.error &&
                 link.failure == BleFailure.bluetoothPermissionDenied)
               const Padding(
-                padding: EdgeInsets.only(top: 8),
+                padding: EdgeInsets.only(top: 10),
                 child: Text(
-                  'iOS no deja pedir el permiso por codigo. Abre Ajustes > '
+                  'iOS no deja pedir el permiso por código. Abre Ajustes > '
                   'Privacidad > Bluetooth y activa el permiso para esta app.',
-                  style: TextStyle(fontSize: 15),
+                  style: TextStyle(fontSize: 14),
                 ),
               ),
-            if (detail)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  'Recorrido: $travel microsegundos'
-                  '${_calibrated == false ? '  (sin calibrar)' : ''}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: scheme.onSurfaceVariant),
-                ),
+
+            // Métricas de telemetría del servomotor
+            if (link.isReady) ...[
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (travel != null)
+                    _telemetryChip(
+                      label: 'RECORRIDO PWM',
+                      value: '$travel µs',
+                      color: AppTheme.techCyan,
+                    ),
+                  _telemetryChip(
+                    label: 'CALIBRACIÓN',
+                    value: _calibrated == true ? 'CALIBRADO' : 'PENDIENTE',
+                    color: _calibrated == true ? AppTheme.ok : AppTheme.amberAccent,
+                  ),
+                  _telemetryChip(
+                    label: 'V-RAIL 6V',
+                    value: _vrailOk ? '6.0V OK' : 'BAJO < 5.0V',
+                    color: _vrailOk ? AppTheme.ok : AppTheme.warn,
+                  ),
+                ],
               ),
+            ],
+
             if (!_vrailOk)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Row(
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.warn.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.warn.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
                   children: [
-                    const Icon(Icons.battery_alert, color: AppTheme.warn, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Alimentación servo insuficiente (< 5.0 V)',
-                      style: TextStyle(color: scheme.error, fontSize: 14, fontWeight: FontWeight.w600),
+                    Icon(Icons.battery_alert, color: AppTheme.warn, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Alimentación servo insuficiente (< 5.0 V). Requiere fuente externa.',
+                        style: TextStyle(color: AppTheme.warn, fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ],
                 ),
@@ -630,18 +780,62 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  Widget _telemetryChip({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _confirmBanner(BuildContext context) {
     return Card(
       color: AppTheme.warn.withValues(alpha: 0.12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppTheme.warn, width: 1.5),
+      ),
       child: const Padding(
         padding: EdgeInsets.all(16),
         child: Row(
           children: <Widget>[
-            Icon(Icons.help_outline, color: AppTheme.warn),
-            SizedBox(width: 12),
+            Icon(Icons.warning_amber_rounded, color: AppTheme.warn, size: 28),
+            SizedBox(width: 14),
             Expanded(
-              child: Text('Di "si" para abrir, o "no" para cancelar.',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w500)),
+              child: Text(
+                'Di "si" para abrir la puerta, o "no" para cancelar.',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              ),
             ),
           ],
         ),
@@ -649,35 +843,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// Botones manuales: hacen falta porque en un corte de red la voz no llega,
-  /// y depender solo de la voz seria una mala decision.
-  ///
-  /// El tercer boton NO es una parada de emergencia: desconecta. Un `estop`
-  /// por boton era peor que inútil, porque empujaba el servo a reposo sin
-  /// saber si la puerta estaba presionada o no, y el producto de un mando a
-  /// distancia se pierde igual. La parada de emergencia sigue existiendo por
-  /// voz ("para" / "alto"), que si llega al firmware.
+  /// Botones de control manual tipo interruptores táctiles de cabina.
   Widget _manualControls(BuildContext context) {
     final enabled = widget.link.isReady;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         FilledButton.icon(
           onPressed: enabled ? () => _manual(AppCommand.open) : null,
-          icon: const Icon(Icons.lock_open),
-          label: const Text('Abrir'),
+          icon: const Icon(Icons.lock_open, size: 24),
+          label: const Text('ABRIR PUERTA'),
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: enabled ? () => _manual(AppCommand.close) : null,
-          icon: const Icon(Icons.lock),
-          label: const Text('Cerrar'),
+          icon: const Icon(Icons.lock, size: 24),
+          label: const Text('CERRAR / REPOSO'),
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: enabled ? _disconnect : null,
-          icon: const Icon(Icons.bluetooth_disabled),
-          label: const Text('Desconectar'),
+          icon: const Icon(Icons.bluetooth_disabled, size: 22),
+          label: const Text('DESCONECTAR BLE'),
         ),
       ],
     );

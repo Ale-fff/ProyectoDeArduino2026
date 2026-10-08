@@ -6,22 +6,10 @@ import 'app_theme.dart';
 import 'widgets/animated_background.dart';
 import 'widgets/logo.dart';
 
-/// Pantalla de bienvenida.
+/// Pantalla de bienvenida / Secuencia de Inicio del Sistema.
 ///
-/// Se queda delante hasta que el Bluetooth ha iniciado Y ha pasado un tiempo
-/// minimo. Las dos condiciones son necesarias:
-///
-///   * la minima, para que un movil rapido no vea un fogonazo de 120 ms que
-///     parece un fallo de render;
-///   * la del Bluetooth, para que al entrar se este ya buscando el ESP32 y la
-///     pantalla principal no aparezca en "Iniciando" durante 3 s.
-///
-/// Detras del splash ya esta pasando todo: la app se construye, el
-/// `BleLink` arranca y `_autoConnect()` busca el ESP32. Al montar la pantalla
-/// principal el enlace suele estar Connected y el usuario no ve el proceso.
-///
-/// El logo entra con escala y opacidad, y se queda respirando con una
-/// pulsacion suave mientras dura.
+/// Permanece activa mientras el subsistema Bluetooth se inicializa y se
+/// verifica la disponibilidad del actuador, con una estética de terminal IoT.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({
     super.key,
@@ -30,9 +18,7 @@ class SplashScreen extends StatefulWidget {
     this.minimumDuration = const Duration(milliseconds: 1700),
   });
 
-  /// Trabajo que hay que esperar: normalmente `BleLink.initialize()`.
   final Future<void> ready;
-
   final VoidCallback onFinished;
   final Duration minimumDuration;
 
@@ -52,6 +38,13 @@ class _SplashScreenState extends State<SplashScreen>
     duration: const Duration(milliseconds: 2200),
   )..repeat(reverse: true);
 
+  late final AnimationController _spin = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 8000),
+  )..repeat();
+
+  late final Stopwatch _swatch;
+
   @override
   void initState() {
     super.initState();
@@ -59,18 +52,10 @@ class _SplashScreenState extends State<SplashScreen>
     unawaited(_waitThenLeave());
   }
 
-  /// Cronometro del splash. Se mide tiempo real, no el valor de la animacion:
-  /// si el Bluetooth tarda 200 ms, solo queda el resto de la espera minima.
-  late final Stopwatch _swatch;
-
   Future<void> _waitThenLeave() async {
-    // Un fallo de Bluetooth no puede impedir abrir la app: la pantalla
-    // principal ya sabe mostrar el error con detalle.
     try {
       await widget.ready;
-    } catch (_) {
-      // La pantalla principal se encarga.
-    }
+    } catch (_) {}
 
     final remaining = widget.minimumDuration - _swatch.elapsed;
     if (remaining > Duration.zero) await Future<void>.delayed(remaining);
@@ -83,6 +68,7 @@ class _SplashScreenState extends State<SplashScreen>
   void dispose() {
     _intro.dispose();
     _pulse.dispose();
+    _spin.dispose();
     super.dispose();
   }
 
@@ -98,27 +84,46 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                // Entrada del logo: escala desde 0.82 y opacidad 0 -> 1, con
-                // una curva que sale rapido y frena (outBack da el rebote).
+                // Logo con anillo de rotación orbital IoT
                 ScaleTransition(
                   scale: Tween<double>(begin: 0.82, end: 1.0).animate(
                     CurvedAnimation(parent: _intro, curve: Curves.easeOutBack),
                   ),
                   child: FadeTransition(
                     opacity: _intro,
-                    child: AnimatedBuilder(
-                      animation: _pulse,
-                      builder: (context, child) {
-                        final k = reduceMotion ? 0.0 : _pulse.value;
-                        // Solo crece un 4 %: si se nota mucho, parece un fallo
-                        // de fidelidad y no una animacion.
-                        return Transform.scale(scale: 1 + (0.04 * k), child: child);
-                      },
-                      child: const ManejIALogo(size: 132),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (!reduceMotion)
+                          RotationTransition(
+                            turns: _spin,
+                            child: SizedBox(
+                              width: 170,
+                              height: 170,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: scheme.primary.withValues(alpha: 0.25),
+                                    width: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        AnimatedBuilder(
+                          animation: _pulse,
+                          builder: (context, child) {
+                            final k = reduceMotion ? 0.0 : _pulse.value;
+                            return Transform.scale(scale: 1 + (0.04 * k), child: child);
+                          },
+                          child: const ManejIALogo(size: 136),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 32),
                 FadeTransition(
                   opacity: CurvedAnimation(
                     parent: _intro,
@@ -130,45 +135,56 @@ class _SplashScreenState extends State<SplashScreen>
                         'ManejIA',
                         style: Theme.of(context).textTheme.displaySmall?.copyWith(
                               color: scheme.onSurface,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
                             ),
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        'Asistente domotico por voz',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: scheme.primary.withValues(alpha: 0.25)),
+                        ),
+                        child: Text(
+                          'SISTEMA DOMÓTICO ESP32-S3 // BLE 5.0',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                            color: scheme.primary,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 44),
+                const SizedBox(height: 48),
                 FadeTransition(
                   opacity: CurvedAnimation(
                     parent: _intro,
                     curve: const Interval(0.6, 1.0, curve: Curves.easeOut),
                   ),
-                  // Aviso de que se esta buscando el actuador: la espera no es
-                  // tiempo muerto, y decirlo evita el "esta colgada".
                   child: Column(
                     children: <Widget>[
                       SizedBox(
-                        width: 132,
+                        width: 160,
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(3),
+                          borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
-                            minHeight: 4,
-                            color: AppTheme.seedLight,
+                            minHeight: 5,
+                            color: scheme.primary,
                             backgroundColor: scheme.outlineVariant,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       Text(
-                        'Buscando el actuador...',
+                        'Sincronizando subsistema Bluetooth...',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: scheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
                             ),
                       ),
                     ],

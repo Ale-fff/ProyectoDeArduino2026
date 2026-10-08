@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 import '../../core/voice_controller.dart';
 import '../app_theme.dart';
 
-/// Boton de microfono.
+/// Botón principal de comando de voz - Consola Táctil IoT.
 ///
-/// Un solo boton, grande y sin adornos. El color es la unica fuente de
-/// informacion sobre el estado, y el estado se lee tambien con el icono, para
-/// que no dependa solo del color.
+/// Diseñado para máxima ergonomía (diámetro de 128 px, objetivo táctil amplio)
+/// y retroalimentación visual inmediata estilo dashboard de control:
 ///
-/// Mientras esta escuchando salen dos anillos que se expanden y se desvanecen:
-/// es la senal de que el microfono esta GRABANDO de verdad. Con el icono quieto
-/// no se distingue "esta escuchando" de "esta pensando", y en una app que se
-/// usa con la puerta de frente, esperar uno por lo otro es un segundo perdido.
+///   * [VoicePhase.idle] -> Botón de activación en reposo con borde luminoso.
+///   * [VoicePhase.listening] -> Anillos de sonar / radar concéntricos expandiéndose
+///     y núcleo vibrante que confirman captura activa de audio.
+///   * [VoicePhase.pendingConfirm] -> Alerta ámbar de confirmación vocal.
+///   * [VoicePhase.executing] -> Indicador técnico de accionamiento mecánico del servo.
 class MicButton extends StatefulWidget {
   const MicButton({
     super.key,
@@ -32,7 +32,7 @@ class MicButton extends StatefulWidget {
 class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMixin {
   late final AnimationController _pulse = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1600),
+    duration: const Duration(milliseconds: 1800),
   );
 
   bool get _isListening => widget.phase == VoicePhase.listening;
@@ -46,8 +46,6 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
   @override
   void didUpdateWidget(MicButton oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // El controlador sigue vivo aunque la fase cambie, asi que hay que
-    // arrancarlo y pararlo a mano.
     if (_isListening && !_pulse.isAnimating) {
       _pulse.repeat();
     } else if (!_isListening && _pulse.isAnimating) {
@@ -68,74 +66,109 @@ class _MicButtonState extends State<MicButton> with SingleTickerProviderStateMix
     final blocked = !widget.enabled || widget.phase == VoicePhase.executing;
     final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
 
-    final (Color bg, Color fg, IconData icon, String label) = switch (widget.phase) {
-      VoicePhase.listening => (scheme.primary, scheme.onPrimary, Icons.mic, 'Escuchando'),
+    final (Color bg, Color fg, Color glowColor, IconData icon, String label) = switch (widget.phase) {
+      VoicePhase.listening => (
+          AppTheme.ok,
+          Colors.white,
+          AppTheme.ok.withValues(alpha: 0.5),
+          Icons.mic,
+          'Escuchando comando de voz',
+        ),
       VoicePhase.pendingConfirm => (
           AppTheme.warn,
           Colors.white,
+          AppTheme.warn.withValues(alpha: 0.5),
           Icons.help_outline,
-          'Confirmar',
+          'Confirmar acción',
         ),
       VoicePhase.executing => (
           scheme.surfaceContainerHighest,
           scheme.onSurfaceVariant,
+          Colors.transparent,
           Icons.settings,
-          'Actuador en movimiento',
+          'Actuador mecánico en movimiento',
         ),
-      VoicePhase.idle => (scheme.secondaryContainer, scheme.onSecondaryContainer, Icons.mic_none, 'Tocar para hablar'),
+      VoicePhase.idle => (
+          scheme.surfaceContainerHigh,
+          scheme.primary,
+          scheme.primary.withValues(alpha: 0.25),
+          Icons.mic_none,
+          'Tocar para hablar',
+        ),
     };
 
-    Widget circle = Semantics(
+    Widget buttonCore = Semantics(
       button: true,
       enabled: !blocked,
       label: label,
-      child: Material(
-        color: bg,
-        shape: const CircleBorder(),
-        elevation: blocked ? 0 : 4,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: blocked ? null : widget.onPressed,
-          child: SizedBox(
-            // 120 px: sobra para un dedo mayor, sin salirse de la pantalla.
-            width: 120,
-            height: 120,
-            child: Icon(icon, size: 56, color: fg),
+      child: Container(
+        width: 128,
+        height: 128,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: blocked
+              ? null
+              : [
+                  BoxShadow(
+                    color: glowColor,
+                    blurRadius: _isListening ? 28 : 16,
+                    spreadRadius: _isListening ? 4 : 1,
+                  ),
+                ],
+        ),
+        child: Material(
+          color: bg,
+          shape: CircleBorder(
+            side: BorderSide(
+              color: _isListening
+                  ? Colors.white.withValues(alpha: 0.6)
+                  : scheme.outlineVariant,
+              width: 2.5,
+            ),
+          ),
+          elevation: blocked ? 0 : 6,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: blocked ? null : widget.onPressed,
+            child: Center(
+              child: Icon(icon, size: 60, color: fg),
+            ),
           ),
         ),
       ),
     );
 
-    // Los anillos van detras del boton y solo mientras escucha.
+    // Anillos de radar concéntricos durante escucha activa
     if (_isListening && !reduceMotion) {
-      circle = Stack(
+      buttonCore = Stack(
         alignment: Alignment.center,
+        clipBehavior: Clip.none,
         children: <Widget>[
-          for (int i = 0; i < 2; i++)
-            _EchoRing(animation: _pulse, delay: i * 0.5, color: bg),
-          circle,
+          for (int i = 0; i < 3; i++)
+            _SonarRing(animation: _pulse, delay: i * 0.33, color: bg),
+          buttonCore,
         ],
       );
     }
 
     return AnimatedScale(
-      // Un pelin de rebote al cambiar de fase: el boton "responde" en vez de
-      // cambiar de golpe.
-      scale: _isListening ? 1.04 : 1.0,
-      duration: const Duration(milliseconds: 220),
+      scale: _isListening ? 1.05 : 1.0,
+      duration: const Duration(milliseconds: 240),
       curve: Curves.easeOutBack,
-      child: circle,
+      child: buttonCore,
     );
   }
 }
 
-/// Anillo que se expande y se apaga. Es la onda de "te estoy oyendo".
-class _EchoRing extends StatelessWidget {
-  const _EchoRing({required this.animation, required this.delay, required this.color});
+/// Anillo de sonar / radar que se expande hacia el exterior simulando la onda de audio.
+class _SonarRing extends StatelessWidget {
+  const _SonarRing({
+    required this.animation,
+    required this.delay,
+    required this.color,
+  });
 
   final Animation<double> animation;
-
-  /// Retraso del anillo, para que no se expandan los dos a la vez.
   final double delay;
   final Color color;
 
@@ -144,20 +177,19 @@ class _EchoRing extends StatelessWidget {
     return AnimatedBuilder(
       animation: animation,
       builder: (context, _) {
-        // 0..1 por ciclo, empezando en `delay` y volviendo al final.
         final raw = (animation.value - delay) % 1.0;
         if (raw < 0) return const SizedBox.shrink();
         final t = raw;
 
         return SizedBox(
-          width: 120 + (60 * t),
-          height: 120 + (60 * t),
+          width: 128 + (90 * t),
+          height: 128 + (90 * t),
           child: DecoratedBox(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: color.withValues(alpha: 0.55 * (1 - t)),
-                width: 3,
+                color: color.withValues(alpha: 0.65 * (1 - t)),
+                width: 2.5,
               ),
             ),
           ),
